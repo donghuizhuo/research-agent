@@ -1,0 +1,69 @@
+snapshot_policy:
+  refresh_mode: manual
+  scheduled_refresh: post_v1
+  campus_scope: seattle
+
+sources:
+  # Computer Science
+  - id: uw_cse_catalog
+    name: UW CSE Catalog
+    tier: 1
+    type: course_catalog
+    authority: official
+    department: CSE
+    url: https://www.washington.edu/students/crscat/cse.html
+    allowed_url_patterns:
+      - https://www.washington.edu/students/crscat/cse.html
+    extraction_policy: normalized_facts_allowed
+    freshness:
+      source_date: optional
+      retrieved_at: required
+      indexed_at: required
+
+  - id: allen_school
+    name: Allen School
+    tier: 2
+    type: department
+    authority: official
+    department: CSE
+    url: https://www.cs.washington.edu/
+    allowed_url_patterns:
+      - https://www.cs.washington.edu/
+      - https://www.cs.washington.edu/*
+    extraction_policy: supporting_context_by_default
+    promotion_rule: clearly_structured_and_directly_cited_only
+    freshness:
+      retrieved_at: required
+      indexed_at: required
+
+  # Informatics
+  - id: uw_info_catalog
+    name: UW INFO Catalog
+    tier: 1
+    type: course_catalog
+    authority: official
+    department: INFO
+    url: https://www.washington.edu/students/crscat/info.html
+    allowed_url_patterns:
+      - https://www.washington.edu/students/crscat/info.html
+    extraction_policy: normalized_facts_allowed
+    freshness:
+      source_date: optional
+      retrieved_at: required
+      indexed_at: required
+
+  - id: uw_informatics
+    name: UW Informatics
+    tier: 2
+    type: department
+    authority: official
+    department: INFO
+    url: https://ischool.uw.edu/programs/informatics
+    allowed_url_patterns:
+      - https://ischool.uw.edu/programs/informatics
+      - https://ischool.uw.edu/programs/informatics/*
+    extraction_policy: supporting_context_by_default
+    promotion_rule: clearly_structured_and_directly_cited_only
+    freshness:
+      retrieved_at: required
+      indexed_at: required
