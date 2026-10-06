@@ -1,0 +1,361 @@
+openapi: 3.1.0
+info:
+  title: UW Course Research Agent API
+  version: 0.1.0
+  description: Read-only API for UW Seattle course search over approved indexed/snapshot sources.
+servers:
+  - url: http://localhost:3000
+paths:
+  /course-search:
+    post:
+      summary: Search UW Seattle courses
+      description: Supports exact code, department, keyword, and scoped natural-language course discovery.
+      operationId: searchCourses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CourseSearchRequest'
+      responses:
+        '200':
+          description: Search response with ranked results, citations, freshness, limitations, and workflow state reference.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseSearchResponse'
+        '400':
+          description: Invalid or out-of-scope request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /courses/{course_id}:
+    get:
+      summary: Get course details
+      operationId: getCourse
+      parameters:
+        - name: course_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: CSE-142
+        - name: workflow_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Course detail response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetailResponse'
+        '404':
+          description: Course not found in approved indexed sources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /workflows/{workflow_id}:
+    get:
+      summary: Inspect workflow state
+      operationId: getWorkflowState
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Persisted workflow state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowState'
+        '404':
+          description: Workflow not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/snapshots/import:
+    post:
+      summary: Manually import approved source snapshots
+      description: Admin/manual MVP import path. Must only ingest sources from config/sources.yml.
+      operationId: importSnapshot
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional subset of approved source IDs. If omitted, import all approved v1 sources.
+      responses:
+        '202':
+          description: Snapshot import accepted or completed, depending on implementation mode.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SnapshotImportResponse'
+        '400':
+          description: Unknown source ID or invalid import request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    CourseSearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+        mode:
+          type: string
+          enum: [auto, exact_code, department, keyword, natural_language]
+          default: auto
+        filters:
+          type: object
+          properties:
+            campus:
+              type: string
+              enum: [seattle]
+              default: seattle
+            department:
+              type: string
+              nullable: true
+            level:
+              type: string
+              nullable: true
+            quarter:
+              type: string
+              nullable: true
+        workflow_id:
+          type: string
+          nullable: true
+    CourseSearchResponse:
+      type: object
+      required:
+        - workflow_id
+        - answer_type
+        - results
+        - limitations
+      properties:
+        workflow_id:
+          type: string
+        answer_type:
+          type: string
+          enum: [ranked_courses, direct_answer, clarification_needed, no_results]
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseResult'
+        limitations:
+          type: array
+          items:
+            type: string
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConflictSummary'
+        state_ref:
+          type: string
+    CourseResult:
+      type: object
+      required:
+        - course_id
+        - department
+        - course_number
+        - citations
+        - freshness
+      properties:
+        course_id:
+          type: string
+        title:
+          type: string
+          nullable: true
+        department:
+          type: string
+        course_number:
+          type: string
+        credits:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+        freshness:
+          $ref: '#/components/schemas/FreshnessMetadata'
+        score:
+          type: number
+          nullable: true
+    CourseDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/CourseResult'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            prerequisites:
+              type: string
+              nullable: true
+            corequisites:
+              type: string
+              nullable: true
+            field_provenance:
+              type: object
+              additionalProperties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Citation'
+            limitations:
+              type: array
+              items:
+                type: string
+    Citation:
+      type: object
+      required:
+        - citation_id
+        - source_id
+        - url
+        - evidence_text
+      properties:
+        citation_id:
+          type: string
+        source_id:
+          type: string
+        source_title:
+          type: string
+          nullable: true
+        url:
+          type: string
+        evidence_text:
+          type: string
+        snapshot_id:
+          type: string
+          nullable: true
+        retrieved_at:
+          type: string
+          format: date-time
+          nullable: true
+        indexed_at:
+          type: string
+          format: date-time
+          nullable: true
+    FreshnessMetadata:
+      type: object
+      properties:
+        snapshot_id:
+          type: string
+          nullable: true
+        source_date:
+          type: string
+          nullable: true
+        retrieved_at:
+          type: string
+          format: date-time
+          nullable: true
+        indexed_at:
+          type: string
+          format: date-time
+          nullable: true
+    WorkflowState:
+      type: object
+      required:
+        - workflow_id
+        - active_query
+        - status
+      properties:
+        workflow_id:
+          type: string
+        active_query:
+          type: string
+        interpreted_filters:
+          type: object
+        selected_courses:
+          type: array
+          items:
+            type: string
+        retrieved_source_ids:
+          type: array
+          items:
+            type: string
+        citation_ids:
+          type: array
+          items:
+            type: string
+        freshness_metadata:
+          type: object
+        unresolved_uncertainty:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [active, needs_clarification, complete, failed]
+        updated_at:
+          type: string
+          format: date-time
+    ConflictSummary:
+      type: object
+      properties:
+        conflict_id:
+          type: string
+        course_id:
+          type: string
+        field:
+          type: string
+        message:
+          type: string
+        citation_ids:
+          type: array
+          items:
+            type: string
+    SnapshotImportResponse:
+      type: object
+      properties:
+        snapshot_id:
+          type: string
+        status:
+          type: string
+          enum: [accepted, completed, failed]
+        imported_source_ids:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        limitations:
+          type: array
+          items:
+            type: string
