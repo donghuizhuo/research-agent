@@ -1,51 +1,56 @@
-# Research: MVP UW Course Search Implementation
+# Research: MVP UW Course Search Implementation (LangGraph)
 
-## Decision: TypeScript full-stack for v1
+## Decision: Use Python + LangGraph as the agent orchestration layer
 
-**Rationale**: The MVP includes ingestion, API, and Web UI. TypeScript allows shared domain types and response schemas across all three surfaces, reducing drift between API contracts, UI rendering, and validation fixtures.
-
-**Alternatives considered**:
-
-- Python API/ingestion + JavaScript UI: strong parsing ecosystem but adds a cross-language boundary.
-- Python-only CLI/API: simpler ingestion but weaker fit for Web UI.
-- Full framework-first app: useful later, but early work benefits from explicit module boundaries.
-
-## Decision: SQLite with FTS5 for MVP persistence/search
-
-**Rationale**: The initial corpus is CSE and INFO sources, likely small enough for a single local database. SQLite supports structured records, workflow state, source/citation tables, and FTS5 for keyword/natural-language discovery without operating a separate search service.
+**Rationale**: The project now follows the `TradingAgents` multi-agent LangGraph framework as its reference architecture. LangGraph's `StateGraph`, conditional routing, structured outputs, and `SqliteSaver` checkpointer map directly to the constitution's "Persistent and Explicit Workflow State" principle and to a testable, inspectable agent pipeline.
 
 **Alternatives considered**:
 
-- PostgreSQL: stronger concurrent production story, but more setup for MVP.
-- OpenSearch/Elasticsearch: powerful search, but operationally heavy for the first vertical slice.
-- In-memory/index files only: simple, but weaker workflow persistence and validation reproducibility.
+- TypeScript + Fastify + custom retrieval service (earlier plan): simpler for a pure search service, but it lacks native agentic orchestration and resumable checkpoint state.
+- LangChain `AgentExecutor`: simpler, but less control over graph shape, routing, and checkpointing than a hand-built `StateGraph`.
 
-## Decision: Manual ingestion CLI first
+## Decision: Grounded answer synthesis only
 
-**Rationale**: The spec says manual refresh for MVP and scheduled refresh later. A CLI/import command keeps ingestion reproducible while avoiding premature scheduling infrastructure.
-
-**Alternatives considered**:
-
-- Scheduled cron/job runner: useful post-v1 but not required yet.
-- Live fetch during query: violates no-live-data and reproducibility constraints.
-
-## Decision: Lexical full-text natural-language search first
-
-**Rationale**: V1 natural-language search is scoped to retrieval and ranking over indexed/snapshot sources. Query normalization plus full-text search over title, description, prerequisites, and department-page chunks is enough for initial validation and keeps citations easier to reason about.
+**Rationale**: The constitution mandates source-grounded accuracy. The LLM is used for query understanding and for composing answers strictly from retrieved, cited facts; it must never generate course facts from parametric memory. A deterministic Grounding Verifier checks that substantive claims carry citations.
 
 **Alternatives considered**:
 
-- Embedding/vector search: may improve semantic recall, but introduces model dependencies, evaluation complexity, and possible precision/citation risks.
-- LLM-only query answering: riskier for unsupported facts and harder to validate.
+- Free-form LLM answering with retrieval augmentation: faster to build, but risks hallucinated prerequisites, credits, or availability.
+- No LLM at all (template answers): safest, but cannot satisfy scoped natural-language course discovery.
 
-## Decision: Explicit source registry as ingestion allowlist
+## Decision: DeepSeek as the default LLM provider
 
-**Rationale**: `config/sources.yml` records approved sources, tiers, URL patterns, extraction policies, and freshness requirements. This prevents accidental broad crawling and keeps source coverage testable.
+**Rationale**: User-selected provider. DeepSeek exposes an OpenAI-compatible endpoint, which `langchain-openai` can consume with a custom `base_url`. A tiered client factory keeps `deep` (answer synthesis) and `quick` (query understanding) models separately configurable, matching TradingAgents.
 
 **Alternatives considered**:
 
-- Hard-code URLs in ingestion code: less transparent and harder to audit.
-- Crawl UW domains dynamically: too broad for v1 and weakens reproducibility.
+- OpenAI, Anthropic, Gemini: supported through the same provider factory for later swaps.
+
+## Decision: Deterministic retrieval nodes over SQLite/FTS5
+
+**Rationale**: Course search retrieval is structured lookup (exact code, department, keyword, natural-language FTS) over approved snapshots — not a reasoning task. Deterministic Python functions are more testable and reproducible than LLM tool-calling loops for v1.
+
+**Alternatives considered**:
+
+- LangChain tool-calling retrieval loops (as in TradingAgents analysts): useful if retrieval becomes multi-step/discoverable, but unnecessary overhead for v1.
+
+## Decision: `SqliteSaver` checkpointer per `workflow_id`
+
+**Rationale**: LangGraph's SQLite checkpointer persists the full graph state, giving resumable and inspectable workflow state. A deterministic `thread_id` derived from the `workflow_id` (and query signature) prevents cross-run state contamination, mirroring TradingAgents' per-ticker checkpointer.
+
+**Alternatives considered**:
+
+- In-memory state: violates persistence requirements.
+- Custom state store: redundant with LangGraph's built-in checkpointer.
+
+## Decision: Explicit source registry as the ingestion allowlist
+
+**Rationale**: `config/sources.yml` records approved sources, tiers, URL patterns, extraction policies, and freshness requirements. This prevents accidental broad crawling and keeps source coverage testable, matching TradingAgents' explicit vendor routing.
+
+**Alternatives considered**:
+
+- Hard-coded URLs in ingestion code: less transparent.
+- Dynamic UW-domain crawling: too broad for v1.
 
 ## Decision: Strict department-page promotion policy
 
@@ -53,14 +58,13 @@
 
 **Alternatives considered**:
 
-- Treat department pages as equal fact sources: higher recall, but greater conflict and parsing risk.
-- Never use department pages for facts: safest, but may miss useful structured department evidence.
+- Department pages as equal fact sources: higher recall, greater conflict/parsing risk.
+- Department pages never used for facts: safest but may miss structured department evidence.
 
-## Decision: Field/source provenance in normalized records
+## Decision: FastAPI + Typer CLI + static Web UI
 
-**Rationale**: Citation and traceability are constitutional principles. Field-level provenance enables precise answers, conflict surfacing, and validation that facts came from approved sources.
+**Rationale**: FastAPI serves the agent and static web UI in one process; Typer provides the manual ingestion/search CLI, mirroring TradingAgents' CLI. This keeps v1 deployable as a single Python service.
 
 **Alternatives considered**:
 
-- Whole-course source citation only: simpler but less precise.
-- Evidence-only without normalized fields: traceable but less efficient for exact lookup/filtering.
+- Separate frontend build (React/Vite): heavier; a simple static UI meets the "simple Web UI" requirement.

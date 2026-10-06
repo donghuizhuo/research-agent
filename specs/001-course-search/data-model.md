@@ -163,11 +163,11 @@ Validation rules:
 
 ## Entity: WorkflowState
 
-Explicit persisted state for multi-step course research.
+Explicit persisted state for multi-step course research. In the LangGraph implementation this is realized by `CourseResearchState` checkpointed via `SqliteSaver` per `workflow_id`.
 
 Fields:
 
-- `workflow_id` string, primary key.
+- `workflow_id` string, primary key (maps to checkpoint `thread_id`).
 - `active_query` string.
 - `interpreted_filters` object.
 - `selected_courses` string array.
@@ -184,6 +184,7 @@ Validation rules:
 
 - Every API search response must include or create a `workflow_id`.
 - Workflow state must persist retrieved sources, citations, freshness metadata, limitations, and unresolved uncertainty.
+- The checkpoint must be resumable: invoking the graph with the same `thread_id` continues rather than duplicating state.
 
 ## Entity Relationships
 

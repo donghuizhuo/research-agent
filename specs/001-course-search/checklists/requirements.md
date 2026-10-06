@@ -41,3 +41,4 @@
 - Department-page extraction clarified: strict for v1; catalog/course descriptions own normalized facts, department pages are supporting context unless clearly structured and directly cited.
 - Source allowlist design clarified: v1 ingestion uses an explicit source registry with tiers, approved URL patterns/URLs, extraction policies, and freshness requirements.
 - Initial source seed added in `config/sources.yml`: UW CSE Catalog, Allen School, UW INFO Catalog, and UW Informatics.
+- Implementation approach clarified: Python + LangGraph agent following the TradingAgents reference design; DeepSeek default LLM; grounded synthesis only; SqliteSaver for persistent workflow state.

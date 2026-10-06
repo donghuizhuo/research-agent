@@ -1,177 +1,146 @@
-# Tasks: MVP UW Course Search
+# Tasks: MVP UW Course Search (LangGraph)
 
 **Feature**: `001-course-search`  
-**Input**: Implementation plan, spec, data model, contracts, and quickstart under `specs/001-course-search/`.
+**Input**: `plan.md`, `spec.md`, `data-model.md`, `contracts/`, `research.md`, `quickstart.md`.
 
-**Stack decisions** (from `research.md` and `plan.md`):
+**Stack**: Python 3.11+, LangGraph, FastAPI, Typer, DeepSeek (OpenAI-compatible), SQLite + FTS5, pytest.
 
-- TypeScript full-stack.
-- Node.js + Fastify API.
-- SQLite via `better-sqlite3` with FTS5 for structured storage and full-text search.
-- React + Vite for the simple Web UI.
-- `vitest` for tests.
-- Manual ingestion CLI driven by `config/sources.yml`.
-
-**Organization**: Tasks are grouped by user story (US) mapped from spec acceptance scenarios, with setup/foundational phases first and a final polish phase.
+**Organization**: Setup → Foundational dataflows → LLM/query understanding → graph assembly by user story → API/Web UI → validation.
 
 ---
 
 ## Phase 1: Setup
 
-**Goal**: Initialize the TypeScript project with the chosen runtime, tooling, and scripts.
+**Goal**: Initialize the Python project with LangGraph/FastAPI/Typer tooling and shared domain types.
 
-- [ ] T001 Create root `package.json` with `type: "module"`, dependencies (`fastify`, `better-sqlite3`, `zod`), dev dependencies (`typescript`, `vitest`, `tsx`, `@types/node`, `@types/better-sqlite3`), and scripts `dev:api`, `dev:web`, `db:init`, `sources:validate`, `ingest`, `test`, `validate` in `package.json`
-- [ ] T002 [P] Create `tsconfig.json` with strict mode, `ES2022` target, `NodeNext` module resolution, and `src/` root in `tsconfig.json`
-- [ ] T003 [P] Create `vitest.config.ts` pointing at `src/**/*.test.ts` in `vitest.config.ts`
-- [ ] T004 [P] Create `.gitignore` excluding `node_modules/`, `dist/`, `data/`, `.env`, and snapshot output directories in `.gitignore`
-- [ ] T005 [P] Create `src/types/domain.ts` with shared TypeScript interfaces for `Course`, `CourseSource`, `Citation`, `FreshnessMetadata`, `WorkflowState`, `SearchResult`, and `SearchQuery` matching `specs/001-course-search/data-model.md` in `src/types/domain.ts`
-
----
-
-## Phase 2: Foundational (blocking prerequisites)
-
-**Goal**: Implement shared infrastructure every user story depends on: source registry validation, database schema, snapshot storage, workflow state, and citation/freshness primitives.
-
-- [ ] T006 Implement `loadSourceRegistry()` that parses `config/sources.yml` and returns typed registry entries with `id`, `tier`, `type`, `authority`, `department`, `url`, `allowed_url_patterns`, `extraction_policy`, and `freshness` in `src/ingest/source-registry.ts`
-- [ ] T007 [P] Implement `isUrlApproved(url, registry)` that returns the matching registry entry or `null` if the URL matches no `allowed_url_patterns` in `src/ingest/source-registry.ts`
-- [ ] T008 [P] Write SQLite schema in `src/db/schema.sql` creating tables `sources`, `snapshots`, `source_documents`, `courses`, `search_documents`, `citations`, `conflicts`, `workflow_state`, plus FTS5 virtual table `search_documents_fts(title, body, content='search_documents', content_rowid='rowid')` in `src/db/schema.sql`
-- [ ] T009 Implement `openDatabase()` and `initSchema()` using `better-sqlite3` to create/load the database file under `data/app.db` and apply `src/db/schema.sql` in `src/db/db.ts`
-- [ ] T010 [P] Implement `SnapshotStore` that writes fetched raw content to a versioned snapshot directory `data/snapshots/{snapshot_id}/{source_id}.html` and records content hash and `retrieved_at` in `src/ingest/snapshot-store.ts`
-- [ ] T011 [P] Implement `createWorkflowState(db, input)` and `getWorkflowState(db, workflowId)` persisting `active_query`, `interpreted_filters`, `selected_courses`, `retrieved_source_ids`, `citation_ids`, `freshness_metadata`, `unresolved_uncertainty`, `limitations`, `status`, and `updated_at` in `src/core/workflow-state.ts`
-- [ ] T012 [P] Implement `buildCitation(sourceDoc, claimField, evidenceText)` and `freshnessFromSource(sourceDoc)` producing `Citation` and `FreshnessMetadata` records that include `snapshot_id`, `retrieved_at`, and `indexed_at` when available in `src/core/citations.ts`
-- [ ] T013 Write tests for source registry: approved URL matches, unregistered URL rejected, tier/extraction policy parsing from `config/sources.yml` in `src/ingest/source-registry.test.ts`
+- [ ] T001 Create `pyproject.toml` with dependencies (`langgraph`, `langchain-core`, `langchain-openai`, `langgraph-checkpoint-sqlite`, `fastapi`, `uvicorn`, `typer`, `pydantic`, `httpx`, `beautifulsoup4`, `python-dotenv`, `rich`) and dev dependencies (`pytest`, `pytest-subtests`), plus `[project.scripts] courseagent = "courseagent.cli.main:app"` in `pyproject.toml`
+- [ ] T002 [P] Create `config/default_config.py` with defaults for `data_dir`, `snapshots_dir`, `db_path`, `sources_path`, `llm_provider`, `quick_model`, `deep_model`, `deepseek_base_url`, and `max_tool_rounds` in `config/default_config.py`
+- [ ] T003 [P] Create `.gitignore` excluding `__pycache__/`, `.venv/`, `dist/`, `data/`, `.env`, and snapshot output directories in `.gitignore`
+- [ ] T004 [P] Create package skeleton `__init__.py` files under `courseagent/`, `courseagent/agents/`, `courseagent/graph/`, `courseagent/dataflows/`, `courseagent/llm_clients/`, `courseagent/api/`, `courseagent/cli/` in `courseagent/`
+- [ ] T005 [P] Implement `CourseResearchState(MessagesState)` in `courseagent/agents/state.py` with annotated fields `query`, `intent`, `interpreted_filters`, `retrieved_courses`, `citations`, `freshness`, `answer`, `structured_answer`, `limitations`, `conflicts`, `needs_clarification`, `status` in `courseagent/agents/state.py`
+- [ ] T006 [P] Implement Pydantic schemas `QueryIntent`, `CourseAnswer`, `Citation`, `FreshnessMetadata`, `CourseSearchResult`, and `render_*` helpers in `courseagent/agents/schemas.py`
 
 ---
 
-## Phase 3: US1 — Exact course-code lookup (P1)
+## Phase 2: Foundational dataflows (blocking prerequisites)
 
-**Goal**: A user can look up a specific UW Seattle course by course code and receive source-grounded facts with citations and freshness metadata.
+**Goal**: Implement the snapshot retrieval backbone: source registry, snapshot storage, parsers, and SQLite/FTS retrieval store.
 
-**Independent test**: After manual ingestion of the CSE catalog, `POST /course-search` with `{"query":"CSE 142","mode":"exact_code"}` returns a course with citations and freshness; `GET /courses/CSE-142` returns detail fields.
-
-- [ ] T014 [US1] Implement `fetchApprovedSources(registry, snapshotId, sourceIds?)` that fetches each approved source URL and writes raw HTML via `SnapshotStore` in `src/ingest/fetcher.ts`
-- [ ] T015 [US1] Implement `parseUwCourseCatalog(html, sourceDoc)` that extracts department code, course number, title, description, and credits into normalized `Course` records with field-level provenance for the UW catalog page structure in `src/ingest/parsers/uw-course-catalog.ts`
-- [ ] T016 [US1] Implement `normalizeCourses(parsed)` that enforces `course_id = {DEPARTMENT}-{NUMBER}`, campus `seattle`, and Tier 1 normalized-fact policy in `src/ingest/normalizer.ts`
-- [ ] T017 [US1] Implement `indexCourses(db, courses, snapshotId)` that upserts normalized courses and writes citations from field provenance into `courses` and `citations` tables in `src/ingest/indexer.ts`
-- [ ] T018 [US1] Implement `ingestSnapshot(sourceIds?)` orchestration in the ingestion CLI: create snapshot record, fetch, parse, normalize, index, and set snapshot `status` to `indexed` in `src/ingest/cli.ts`
-- [ ] T019 [US1] Implement exact course lookup `findCourseByCode(db, department, number)` with SQL matching `course_id` or `department_code + course_number` in `src/core/retrieval.ts`
-- [ ] T020 [US1] Implement `composeCourseAnswer(course, citations, freshness)` that returns title, department, course number, description, credits and attaches citations/freshness while emitting `limitations` for unavailable fields in `src/core/answer-composer.ts`
-- [ ] T021 [US1] Implement `POST /course-search` route that parses `query`/`mode`, routes exact-code queries to `findCourseByCode`, composes the answer, creates/updates `WorkflowState`, and returns `CourseSearchResponse` in `src/api/routes/course-search.ts`
-- [ ] T022 [US1] Implement `GET /courses/{course_id}` route returning `CourseDetailResponse` with per-field citations and limitations in `src/api/routes/courses.ts`
-- [ ] T023 [US1] Implement `GET /workflows/{workflow_id}` route returning persisted `WorkflowState` in `src/api/routes/workflows.ts`
-- [ ] T024 [US1] Implement Fastify server assembly registering routes and JSON schema validation in `src/api/server.ts`
-- [ ] T025 [US1] Write tests for exact course-code retrieval and answer composition using a fixture CSE catalog HTML in `src/core/retrieval.test.ts` and `src/core/answer-composer.test.ts`
-- [ ] T026 [US1] Write an API integration test that seeds a minimal DB and asserts exact lookup response includes citation and freshness in `src/api/routes/course-search.test.ts`
+- [ ] T007 Implement `load_source_registry(path)` and `is_url_approved(url, registry)` that parse `config/sources.yml` and match URLs against `allowed_url_patterns` in `courseagent/dataflows/source_registry.py`
+- [ ] T008 [P] Implement `open_db(path)` and `init_schema(conn)` creating tables `sources`, `snapshots`, `source_documents`, `courses`, `search_documents`, `citations`, `conflicts`, plus FTS5 virtual table `search_documents_fts(title, body, content='search_documents')` in `courseagent/dataflows/db.py`
+- [ ] T009 [P] Implement `SnapshotStore` writing raw content to `data/snapshots/{snapshot_id}/{source_id}.html` with content hash and `retrieved_at` in `courseagent/dataflows/snapshot_store.py`
+- [ ] T010 Implement `fetch_approved_sources(registry, snapshot_id, source_ids?)` using `httpx` that fetches only approved URLs and writes snapshots in `courseagent/dataflows/fetcher.py`
+- [ ] T011 [P] Implement `parse_uw_course_catalog(html, source_doc)` extracting department code, course number, title, description, credits, prerequisites, corequisites with field provenance in `courseagent/dataflows/parsers/uw_course_catalog.py`
+- [ ] T012 [P] Implement `chunk_department_page(html)` producing searchable department-context chunks without promoting them to normalized facts in `courseagent/dataflows/parsers/department_page.py`
+- [ ] T013 Implement `normalize_courses(parsed)` enforcing `course_id = {DEPARTMENT}-{NUMBER}`, campus `seattle`, and Tier 1 fact policy in `courseagent/dataflows/normalizer.py`
+- [ ] T014 Implement `index_courses(db, courses, snapshot_id)` upserting courses, search documents, and citations from field provenance in `courseagent/dataflows/indexer.py`
+- [ ] T015 [P] Implement `find_course_by_code`, `search_department`, `search_keyword`, `search_natural_language` over SQLite/FTS5 in `courseagent/dataflows/retrieval.py`
+- [ ] T016 Implement `ingest` Typer command that creates a snapshot record, fetches, parses, normalizes, indexes, and sets snapshot `status` to `indexed` in `courseagent/cli/main.py`
+- [ ] T017 Write tests for source registry allowlist checks and catalog parsing using fixture HTML in `tests/test_source_registry.py` and `tests/test_catalog_parser.py`
 
 ---
 
-## Phase 4: US2 — Department & keyword search (P1)
+## Phase 3: LLM clients + query understanding
 
-**Goal**: A user can search by department or keyword and receive a ranked list of relevant courses.
+**Goal**: Provide tiered LLM clients and the structured query-intent classifier that drives graph routing.
 
-**Independent test**: `POST /course-search` with `{"query":"CSE","mode":"department","filters":{"department":"CSE"}}` returns ranked CSE results with citations.
-
-- [ ] T027 [US2] Extend `src/ingest/indexer.ts` to write each course title, description, and prerequisites into `search_documents` and the FTS5 table with `document_type = 'course_record'` in `src/ingest/indexer.ts`
-- [ ] T028 [US2] Implement `searchCourses(db, query, filters)` using FTS5 `MATCH` for keyword queries and `department_code` filtering, returning ranked rows with relevance scores in `src/core/retrieval.ts`
-- [ ] T029 [US2] Implement department abbreviation parsing in `interpretQuery()` that maps department terms and detects `department`/`keyword`/`exact_code` intent in `src/core/query-understanding.ts`
-- [ ] T030 [US2] Extend `composeCourseAnswer` path to compose a `ranked_courses` response with concise per-course summaries and citation links in `src/core/answer-composer.ts`
-- [ ] T031 [US2] Wire department/keyword modes into `POST /course-search` route and persist retrieved source/citation IDs to `WorkflowState` in `src/api/routes/course-search.ts`
-- [ ] T032 [US2] Write tests for department and keyword search returning at least one relevant result in the top five using fixture course data in `src/core/retrieval.test.ts`
+- [ ] T018 Implement `create_tier_client(config, tier)` returning DeepSeek `ChatOpenAI` clients (custom `base_url`) for `deep`/`quick` tiers with OpenAI-compatible fallback in `courseagent/llm_clients/factory.py`
+- [ ] T019 Implement `classify_query(query, llm)` returning a `QueryIntent` structured output (intent enum + parsed filters) in `courseagent/agents/query_understanding.py`
+- [ ] T020 Implement `ConditionalLogic.route(state)` returning `exact_code | department | keyword | natural_language | ambiguous | out_of_scope` based on `state["intent"]` in `courseagent/graph/conditional_logic.py`
+- [ ] T021 Write tests for `QueryIntent` classification and router behavior using a stub LLM in `tests/test_query_understanding.py` and `tests/test_conditional_logic.py`
 
 ---
 
-## Phase 5: US3 — Natural-language course discovery (P1)
+## Phase 4: US1 — Exact course-code lookup graph (P1)
 
-**Goal**: A user can ask a natural-language course discovery question and get ranked relevant courses without personalized advising.
+**Goal**: A user can look up a specific course and receive a grounded answer with citations, freshness, and resumable workflow state.
 
-**Independent test**: `POST /course-search` with `{"query":"intro programming courses","mode":"natural_language"}` returns relevant indexed courses and limitations; no advising claims are produced.
+**Independent test**: After manual ingestion of the CSE catalog, invoking the graph with `{"query":"CSE 142","intent":"exact_code"}` returns an answer with citation and freshness, checkpointed under a `workflow_id`.
 
-- [ ] T033 [US3] Implement query normalization for natural-language input: lowercase, strip stopwords, extract department/code/level hints into `interpreted_filters` in `src/core/query-understanding.ts`
-- [ ] T034 [US3] Implement natural-language retrieval path that converts the normalized query into an FTS5 query over `search_documents_fts` and ranks results in `src/core/retrieval.ts`
-- [ ] T035 [US3] Add department-page context chunks to `search_documents` with `document_type = 'department_context'` via a `chunkDepartmentPage(html)` helper in `src/ingest/parsers/department-page.ts`
-- [ ] T036 [US3] Implement `composeNaturalLanguageAnswer()` that returns `ranked_courses`, attaches `limitations` for snapshot-only/no-live-data behavior, and refuses advising-style claims in `src/core/answer-composer.ts`
-- [ ] T037 [US3] Wire `natural_language` mode into the search route and persist limitations/unresolved uncertainty to `WorkflowState` in `src/api/routes/course-search.ts`
-- [ ] T038 [US3] Write tests for natural-language query normalization and retrieval relevance using fixture search documents in `src/core/query-understanding.test.ts` and `src/core/retrieval.test.ts`
-
----
-
-## Phase 6: US4 + US5 — Prerequisites and quarter availability (P2)
-
-**Goal**: The system returns prerequisites/corequisites only when source-supported and never claims quarter-specific offering without snapshot confirmation.
-
-**Independent test**: A course with prerequisites in the catalog returns them with citations; a course without them returns "unavailable" rather than inferred; a quarter question returns availability only when snapshot data confirms it.
-
-- [ ] T039 [US4] Extend `parseUwCourseCatalog` to extract prerequisites and corequisites into normalized `Course` fields with provenance in `src/ingest/parsers/uw-course-catalog.ts`
-- [ ] T040 [US4] Extend `composeCourseAnswer` to return prerequisite/corequisite facts only when cited and emit a limitation when unavailable in `src/core/answer-composer.ts`
-- [ ] T041 [US5] Implement `hasQuarterConfirmation(course, quarter)` that returns true only when a cited snapshot source confirms that quarter; otherwise returns false in `src/core/freshness.ts`
-- [ ] T042 [US5] Extend the search/detail response to answer quarter questions only from confirmed snapshot data and return a live-only limitation otherwise in `src/core/answer-composer.ts`
-- [ ] T043 [US4] Write tests for prerequisite extraction and unavailable-prerequisite messaging in `src/ingest/parsers/uw-course-catalog.test.ts` and `src/core/answer-composer.test.ts`
-- [ ] T044 [US5] Write tests that quarter offering is never confirmed when snapshot lacks that quarter in `src/core/freshness.test.ts`
+- [ ] T022 [US1] Implement `exact_code_retriever(state)` node that calls `find_course_by_code` and populates `retrieved_courses`, `citations`, and `freshness` in `courseagent/agents/retrievers.py`
+- [ ] T023 [US1] Implement `compose_answer(state)` node using the deep LLM to synthesize a `CourseAnswer` only from `retrieved_courses` + `citations`, with grounded-synthesis prompt instructions in `courseagent/agents/answer_composer.py`
+- [ ] T024 [US1] Implement `verify_grounding(state)` node that checks each substantive claim has a citation and downgrades uncited claims to limitations in `courseagent/agents/grounding.py`
+- [ ] T025 [US1] Implement `setup_graph()` building the `StateGraph` with `START -> Query Understanding -> conditional -> retriever -> Answer Composer -> Grounding Verifier -> END` in `courseagent/graph/setup.py`
+- [ ] T026 [US1] Implement `SqliteSaver` wrapper `get_checkpointer(data_dir, workflow_id)` and deterministic `thread_id` helper in `courseagent/graph/checkpointer.py`
+- [ ] T027 [US1] Implement `CourseResearchGraph` orchestration class with `run(query, workflow_id)` that compiles with the checkpointer and invokes/streams the graph in `courseagent/graph/course_graph.py`
+- [ ] T028 [US1] Write graph integration test seeding a minimal DB and asserting exact lookup returns cited, fresh, checkpointed answer in `tests/test_course_graph_us1.py`
 
 ---
 
-## Phase 7: US6 + US7 + US8 — Web fallback labeling, conflicts, and privacy (P2)
+## Phase 5: US2 + US3 — Department, keyword, and natural-language search (P1)
 
-**Goal**: The system labels web-search answers, surfaces conflicts, and avoids sensitive student data.
+**Goal**: Users can search by department, keyword, or natural-language discovery and receive ranked, cited results.
 
-**Independent test**: Structured-miss queries do not present generic web results as facts; conflicting sources produce a conflict summary; sensitive inputs are not stored.
+**Independent test**: `department`/`keyword`/`natural_language` intents return ranked results with citations and snapshot-only limitations.
 
-- [ ] T045 [US6] Implement `composeFallbackAnswer()` that returns a labeled limitation instead of authoritative facts when structured retrieval misses and open-ended web search is not justified in `src/core/answer-composer.ts`
-- [ ] T046 [US7] Implement `detectConflicts(db, courseId, field)` that compares cited values across sources and returns `Conflict` records rather than silently choosing one in `src/core/citations.ts`
-- [ ] T047 [US7] Add `conflicts` array to the course detail and search responses when material conflicts exist in `src/core/answer-composer.ts`
-- [ ] T048 [US8] Implement `redactSensitiveInput(query)` that strips obvious student identifiers (ID numbers, NetID-like tokens) before logging or storing in `src/core/privacy.ts`
-- [ ] T049 [US8] Apply `redactSensitiveInput` in the search route before persisting workflow state and reject requests that require private student data in `src/api/routes/course-search.ts`
-- [ ] T050 [US7] Write tests for conflict detection and conflict surfacing in `src/core/citations.test.ts` and `src/core/answer-composer.test.ts`
-- [ ] T051 [US8] Write tests for sensitive-input redaction and non-persistence in `src/core/privacy.test.ts`
+- [ ] T029 [US2] Implement `department_retriever` and `keyword_retriever` nodes in `courseagent/agents/retrievers.py` using `search_department` and `search_keyword` in `courseagent/agents/retrievers.py`
+- [ ] T030 [US3] Implement `natural_language_retriever` node using `search_natural_language` over FTS5 in `courseagent/agents/retrievers.py`
+- [ ] T031 [US2] Extend `compose_answer` to produce `ranked_courses` responses with concise per-course summaries and citation links in `courseagent/agents/answer_composer.py`
+- [ ] T032 [US2] Extend `setup_graph` to wire department/keyword/natural-language retriever nodes into the conditional router in `courseagent/graph/setup.py`
+- [ ] T033 [US2] Write tests for department/keyword ranking and natural-language discovery using fixture search documents in `tests/test_retrievers.py`
 
 ---
 
-## Phase 8: Web UI (P1 surface)
+## Phase 6: US4–US8 — Prerequisites, availability, conflicts, privacy (P2)
 
-**Goal**: A simple browser UI exposes exact lookup, department/keyword search, natural-language search, citations, freshness, and workflow-state-backed follow-ups.
+**Goal**: Handle prerequisites/quarter availability conservatively, surface conflicts, and protect sensitive data.
 
-**Independent test**: Manual UI check confirms all six `ui-contract.md` validation scenarios.
+**Independent test**: Prerequisites return only when cited; quarter offering is never confirmed without snapshot data; conflicts are surfaced; sensitive input is redacted.
 
-- [ ] T052 [US1] Scaffold Vite + React + TypeScript web app under `src/web/` with an `index.html` and dev server wiring in `src/web/`
-- [ ] T053 [P] [US1] Implement `SearchBox` component that submits queries and preserves `workflow_id` in `src/web/components/SearchBox.tsx`
-- [ ] T054 [P] [US1] Implement `ResultsList` component that renders ranked results with course ID, title, credits, and citation count in `src/web/components/ResultsList.tsx`
-- [ ] T055 [P] [US1] Implement `CourseDetail` component that calls `GET /courses/{id}` and renders fields with unavailable-placeholder handling in `src/web/components/CourseDetail.tsx`
-- [ ] T056 [P] [US1] Implement `CitationPanel` component showing source title, URL, evidence, snapshot ID, and timestamps in `src/web/components/CitationPanel.tsx`
-- [ ] T057 [P] [US1] Implement `LimitationBanner` component showing snapshot-only/no-live-data messaging and contextual limitations in `src/web/components/LimitationBanner.tsx`
-- [ ] T058 [US1] Implement `App.tsx` composing SearchBox, ResultsList, CourseDetail, CitationPanel, and LimitationBanner with a shared API client in `src/web/App.tsx`
-- [ ] T059 [US1] Add a minimal UI validation checklist mapping to `contracts/ui-contract.md` scenarios in `src/web/UI_VALIDATION.md`
+- [ ] T034 [US4] Ensure `compose_answer` returns prerequisite/corequisite facts only when cited and emits a limitation otherwise in `courseagent/agents/answer_composer.py`
+- [ ] T035 [US5] Implement `has_quarter_confirmation(course, quarter)` and wire quarter-availability limitations into answers in `courseagent/agents/grounding.py`
+- [ ] T036 [US6] Implement `out_of_scope_responder` node returning a labeled limitation instead of authoritative facts when structured retrieval misses in `courseagent/agents/clarifier.py`
+- [ ] T037 [US6] Implement `clarifier` node producing a follow-up `needs_clarification` question for ambiguous queries in `courseagent/agents/clarifier.py`
+- [ ] T038 [US7] Implement `detect_conflicts(courses, citations)` comparing cited values across sources and populating `conflicts` in `courseagent/agents/grounding.py`
+- [ ] T039 [US8] Implement `redact_sensitive_input(query)` stripping student IDs/NetID-like tokens before state persistence/logging in `courseagent/agents/grounding.py`
+- [ ] T040 [US4] Write tests for prerequisites, quarter availability, conflict detection, and sensitive-input redaction in `tests/test_grounding.py` and `tests/test_privacy.py`
 
 ---
 
-## Phase 9: Polish & cross-cutting concerns
+## Phase 7: API + Web UI (P1 surface)
 
-**Goal**: Add golden validation cases, end-to-end validation, and release readiness documentation.
+**Goal**: Expose the agent through a FastAPI API and a simple browser UI with citations, freshness, and limitation display.
 
-- [ ] T060 Implement `validation/golden-cases.json` with CSE/INFO exact-lookup, department, keyword, natural-language, missing-field, live-only, conflict, and workflow-state cases in `validation/golden-cases.json`
-- [ ] T061 Implement `validation/run-validation.ts` that loads `validation/golden-cases.json` and runs the API/retrieval paths, reporting pass/fail in `validation/run-validation.ts`
-- [ ] T062 Implement `src/api/routes/admin.ts` exposing restricted `POST /admin/snapshots/import` that calls `ingestSnapshot` with approved source IDs only in `src/api/routes/admin.ts`
-- [ ] T063 Wire `npm run sources:validate`, `npm run db:init`, `npm run ingest`, `npm run dev:api`, `npm run dev:web`, `npm test`, and `npm run validate` scripts to the implemented modules in `package.json`
-- [ ] T064 Update `specs/001-course-search/quickstart.md` to match any final command names and confirm each documented step is runnable in `specs/001-course-search/quickstart.md`
-- [ ] T065 Run `npm test` and `npm run validate`, fix failures, and record a passing validation run result in `.agent-state.md`
+**Independent test**: API endpoints and the static UI complete exact lookup, department/keyword/NL search, course detail, and workflow inspection.
+
+- [ ] T041 Implement FastAPI app with `POST /course-search`, `GET /courses/{course_id}`, `GET /workflows/{workflow_id}`, and `POST /admin/snapshots/import` calling `CourseResearchGraph` in `courseagent/api/app.py`
+- [ ] T042 Implement API request/response Pydantic models matching `contracts/openapi.yaml` in `courseagent/api/schemas.py`
+- [ ] T043 [P] Implement `POST /course-search` route that builds `workflow_id`, runs the graph, and returns the structured answer with citations/freshness/limitations in `courseagent/api/routes/search.py`
+- [ ] T044 [P] Implement `GET /courses/{course_id}` route returning course detail with per-field citations in `courseagent/api/routes/courses.py`
+- [ ] T045 [P] Implement `GET /workflows/{workflow_id}` route reading checkpointed state in `courseagent/api/routes/workflows.py`
+- [ ] T046 [P] Implement `POST /admin/snapshots/import` route delegating to the ingest command with approved source IDs only in `courseagent/api/routes/admin.py`
+- [ ] T047 Implement `serve` Typer command starting uvicorn for the FastAPI app and static web UI in `courseagent/cli/main.py`
+- [ ] T048 [P] Implement static Web UI `index.html`, `app.js`, `styles.css` with search box, results list, course detail, citation panel, and limitation banner in `courseagent/web/`
+- [ ] T049 [P] Add UI validation checklist mapping to `contracts/ui-contract.md` scenarios in `courseagent/web/UI_VALIDATION.md`
+- [ ] T050 Write API integration tests asserting `POST /course-search` returns citation and freshness for a seeded course in `tests/test_api_search.py`
+
+---
+
+## Phase 8: Validation & release readiness
+
+**Goal**: Add golden validation cases, wire the pytest suite, and confirm release readiness.
+
+- [ ] T051 Implement `validation/golden-cases.json` with CSE/INFO exact-lookup, department, keyword, natural-language, missing-field, live-only, conflict, and workflow-state cases in `validation/golden-cases.json`
+- [ ] T052 Implement `validation/run_validation.py` loading golden cases and running the graph/API paths, reporting pass/fail in `validation/run_validation.py`
+- [ ] T053 Update `specs/001-course-search/quickstart.md` to match final CLI/API commands and confirm each documented step is runnable in `specs/001-course-search/quickstart.md`
+- [ ] T054 Run `pytest` and `validation/run_validation.py`, fix failures, and record a passing validation run in `.agent-state.md`
 
 ---
 
 ## Dependencies
 
-- US1 (Phase 3) depends on Foundational (Phase 2).
-- US2 (Phase 4) depends on US1 ingestion/indexing.
-- US3 (Phase 5) depends on US2 FTS indexing and query understanding.
-- US4/US5 (Phase 6) depend on US1 parser and answer composer.
-- US6/US7/US8 (Phase 7) depend on US1 answer composer and citations.
-- Web UI (Phase 8) depends on the API routes from US1–US3.
-- Polish (Phase 9) depends on all prior phases.
+- US1 (Phase 4) depends on Foundational dataflows (Phase 2) and query understanding (Phase 3).
+- US2/US3 (Phase 5) depend on US1 graph assembly.
+- US4–US8 (Phase 6) depend on US1 answer composer/grounding nodes.
+- API/Web UI (Phase 7) depend on the graph from US1–US3.
+- Validation (Phase 8) depends on all prior phases.
 
 ## Parallel execution opportunities
 
-- Within Phase 1: T002, T003, T004, T005 can run in parallel.
-- Within Phase 2: T007, T008, T010, T011, T012 can run in parallel after T006/T009.
-- Within Phase 8: T053–T057 can run in parallel after T052.
+- Phase 1: T002–T006 parallel after T001.
+- Phase 2: T008, T009, T011, T012, T015 parallel after T007/T010/T013/T014.
+- Phase 7: T043–T046 and T048–T049 parallel after T041/T042.
 
 ## Suggested MVP scope
 
-Ship the minimum: Phase 1 → Phase 2 → Phase 3 (US1 exact lookup) as the first vertical slice, then add US2/US3 search, then the Web UI.
+Ship the minimum: Phase 1 → Phase 2 → Phase 3 → Phase 4 (US1 exact lookup through the full graph with checkpointing), then add US2/US3 search, then API/Web UI.

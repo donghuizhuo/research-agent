@@ -143,45 +143,76 @@ Restricted/admin-only for MVP operations. Imports approved snapshots or approved
 
 ## 4. High-Level Architecture
 
+V1 is implemented as a **LangGraph agent** following the `TradingAgents` reference design.
+
 ```mermaid
 flowchart LR
   U[User] --> UI[Web UI]
-  U --> API[Course Research API]
+  U --> API[FastAPI]
   UI --> API
-  API --> QS[Query Understanding]
-  QS --> RET[Retrieval Orchestrator]
-  RET --> IDX[Search Index\nfull-text + optional vectors]
-  RET --> CDB[(Course Metadata Store)]
-  RET --> SDB[(Source & Citation Store)]
-  API --> AG[Answer Generator]
-  AG --> CDB
-  AG --> SDB
-  API --> WFS[(Workflow State Store)]
+  API --> GRAPH[LangGraph CourseResearchGraph]
 
-  ING[Batch Ingestion Pipeline] --> FETCH[Approved Source Fetchers\nUW catalog + dept pages]
+  subgraph GRAPH[LangGraph Agent]
+    QS[Query Understanding<br/>quick LLM + QueryIntent]
+    ROUTE{ConditionalLogic}
+    EX[ExactCodeRetriever]
+    DP[DepartmentRetriever]
+    KW[KeywordRetriever]
+    NL[NLRetriever]
+    CL[Clarifier]
+    OOS[OutOfScopeResponder]
+    AC[Answer Composer<br/>deep LLM grounded synthesis]
+    GV[Grounding Verifier]
+    QS --> ROUTE
+    ROUTE --> EX
+    ROUTE --> DP
+    ROUTE --> KW
+    ROUTE --> NL
+    ROUTE --> CL
+    ROUTE --> OOS
+    EX --> AC
+    DP --> AC
+    KW --> AC
+    NL --> AC
+    AC --> GV
+  end
+
+  EX --> IDX[(SQLite + FTS5<br/>courses + search documents)]
+  DP --> IDX
+  KW --> IDX
+  NL --> IDX
+  IDX --> CDB[(Source & Citation)]
+  API --> CK[(SqliteSaver<br/>workflow checkpoints)]
+  GRAPH --> CK
+
+  ING[Ingestion CLI<br/>Typer] --> REG[config/sources.yml]
+  ING --> FETCH[Approved Source Fetchers]
   FETCH --> PARSE[Parser / Normalizer]
-  PARSE --> SDB
-  PARSE --> CDB
   PARSE --> IDX
-  PARSE --> SNAP[(Snapshot/Object Store)]
+  PARSE --> SNAP[(Snapshot Store)]
 
   VAL[Validation Suite] --> API
-  VAL --> IDX
+  VAL --> GRAPH
 ```
+
+### LangGraph state
+
+The graph operates over `CourseResearchState(MessagesState)` with fields `query`, `intent`, `interpreted_filters`, `retrieved_courses`, `citations`, `freshness`, `answer`, `structured_answer`, `limitations`, `conflicts`, `needs_clarification`, and `status`. The full state is checkpointed by `SqliteSaver` per `workflow_id`, which realizes the persistent workflow-state requirement.
 
 ### Component responsibilities
 
-- **Web UI**: Simple browser interface for search, result inspection, citations/freshness display, limitation messages, and workflow-state-backed follow-ups.
-- **Course Research API**: Stateless request handling for both Web UI and direct API clients, auth boundary if needed later, response formatting, validation hooks.
-- **Query Understanding**: Parses exact course codes, department filters, level hints, quarter mentions, and natural-language discovery intent.
-- **Retrieval Orchestrator**: Applies structured retrieval first: exact lookup, department/keyword search, then semantic/natural-language search over approved indexed sources.
-- **Search Index**: Full-text index and optional vector index over course titles, descriptions, prerequisites, and department-page chunks.
-- **Course Metadata Store**: Normalized course entities and field-level provenance pointers.
-- **Source & Citation Store**: Source records, URLs/document IDs, snapshot IDs, retrieval/index timestamps, evidence snippets, and conflict metadata.
-- **Answer Generator**: Produces concise source-grounded answers; refuses unsupported claims; labels freshness and limitations.
-- **Workflow State Store**: Explicit persisted state for active query, filters, selected courses, retrieved sources, citations, uncertainty, and status.
-- **Batch Ingestion Pipeline**: Fetches approved sources, parses content, normalizes catalog/course-description records, chunks department pages as supporting searchable context, promotes department-page facts only when clearly structured and directly cited, computes freshness, and updates indexes.
-- **Snapshot/Object Store**: Preserves raw/source snapshots for reproducibility and citation traceability.
+- **Web UI**: Simple static browser interface for search, result inspection, citations/freshness display, limitation messages, and workflow-state-backed follow-ups.
+- **FastAPI**: Serves the Web UI and the `POST /course-search`, `GET /courses/{id}`, `GET /workflows/{id}`, and `POST /admin/snapshots/import` endpoints; delegates each search to the LangGraph agent.
+- **Query Understanding**: Quick-tier LLM node producing a structured `QueryIntent` (intent + parsed filters).
+- **ConditionalLogic**: Deterministic router mapping `intent` to the matching retrieval node or responder.
+- **Retrieval nodes**: Deterministic SQLite/FTS lookups (`exact_code`, `department`, `keyword`, `natural_language`) that populate `retrieved_courses`, `citations`, and `freshness`. No live UW systems.
+- **Answer Composer**: Deep-tier LLM grounded synthesis that may only restate retrieved, cited facts.
+- **Grounding Verifier**: Deterministic check that substantive claims carry citations; uncited claims are downgraded to limitations.
+- **Clarifier / OutOfScopeResponder**: Ambiguity follow-up and out-of-scope/live-only limitation responses.
+- **SqliteSaver checkpointer**: Persistent, resumable workflow state per `workflow_id`.
+- **SQLite + FTS5 store**: Normalized course records, source/citation records, and full-text search documents.
+- **Ingestion CLI**: Fetches approved sources, parses content, normalizes catalog records, chunks department pages as searchable context, and updates indexes.
+- **Snapshot Store**: Preserves raw/source snapshots for reproducibility and citation traceability.
 - **Validation Suite**: Golden queries and expected behaviors for exact lookup, search, NL retrieval, citations, freshness, missing/conflicting data, privacy, and state preservation.
 
 ## 5. Data Model
