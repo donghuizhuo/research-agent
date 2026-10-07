@@ -1,33 +1,133 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UW Course Research Agent</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UW Course Search</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <h1>UW Course Research Agent</h1>
-    <p class="subtitle">Read-only UW Seattle course search over approved indexed/snapshot sources.</p>
+  <a class="skip-link" href="#main">Skip to search</a>
+
+  <header class="site-header">
+    <div class="uw-line" aria-hidden="true"></div>
+    <div class="site-header__inner">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">UW</div>
+        <div>
+          <p class="eyebrow">UW Course Research Agent</p>
+          <h1>UW Course Search</h1>
+          <p class="subtitle">Find courses by code, subject, or what you want to learn.</p>
+        </div>
+      </div>
+      <div class="session-card" aria-label="Research session">
+        <span class="session-card__label">Research session</span>
+        <strong id="workflow-id">not started</strong>
+        <span id="state-ref">Catalog search</span>
+      </div>
+    </div>
   </header>
 
-  <main>
-    <section class="search-box">
-      <input id="query" type="text" placeholder="e.g. CSE 142, INFO courses, introductory programming" autofocus />
-      <button id="search-btn">Search</button>
+  <div class="snapshot-banner" role="note" aria-label="Course search coverage">
+    <strong>Course coverage:</strong> UW Seattle CSE and INFO from indexed catalog sources. Live seats, enrollment, registration status, and schedule changes are unavailable here.
+  </div>
+
+  <main id="main" class="page-shell">
+    <section class="hero-card" aria-labelledby="search-heading">
+      <div class="hero-card__copy">
+        <p class="eyebrow">Search view</p>
+        <h2 id="search-heading">Find your next course</h2>
+        <p>
+          Enter a course code, a topic, or a question such as “intro programming courses.” Choose a department to browse or narrow the returned matches.
+        </p>
+      </div>
+
+      <form id="search-form" class="search-form" aria-describedby="search-help">
+        <div class="field field--query">
+          <label for="query-input"><span>Search query <em>(optional)</em></span></label>
+          <input id="query-input" name="query" type="search" autocomplete="off" placeholder="CSE 142, intro programming, machine learning" aria-describedby="typeahead-help" aria-controls="typeahead-list" aria-expanded="false" />
+          <small id="typeahead-help">Start typing for suggestions, or choose a department and search. Suggestions cover the matches returned by course search.</small>
+          <div id="typeahead-list" class="typeahead-list" aria-label="Course suggestions" hidden></div>
+        </div>
+        <label class="field" for="department-filter">
+          <span>Department</span>
+          <select id="department-filter" name="department">
+            <option value="">All departments</option>
+            <option value="CSE">CSE</option>
+            <option value="INFO">INFO</option>
+          </select>
+        </label>
+        <button class="primary-button" type="submit">Search</button>
+      </form>
+      <p id="search-help" class="help-text">Choose a suggestion to open a course directly, or press Search to see matches. Select a course to read its description, credits, and prerequisites.</p>
+
+      <details class="scenario-shortcuts">
+        <summary>Try an example</summary>
+        <div class="example-row" aria-label="Example searches">
+          <button type="button" class="example-chip" data-query="CSE 142">Exact: CSE 142</button>
+          <button type="button" class="example-chip" data-query="CSE">Department: CSE</button>
+          <button type="button" class="example-chip" data-query="intro programming courses">Natural language</button>
+          <button type="button" class="example-chip" data-query="machine learning">Keyword</button>
+        </div>
+      </details>
     </section>
 
-    <section id="limitations" class="limitation-banner" hidden></section>
 
-    <section id="results" class="results">
-      <h2>Results</h2>
-      <div id="results-list"></div>
+    <section id="status-region" class="status-region" aria-live="polite" aria-atomic="true"></section>
+
+    <section id="limitations" class="status-message warning" aria-label="Search limitations" hidden></section>
+    <details id="debug-session" hidden><summary>Development session</summary><code id="debug-workflow"></code></details>
+
+    <section id="loading-state" class="loading-state" hidden role="status" aria-label="Searching courses">
+      <div class="loader-card">
+        <span class="spinner" aria-hidden="true"></span>
+        <div>
+          <strong>Searching courses…</strong>
+          <p>Finding courses that match your search.</p>
+        </div>
+      </div>
+      <div class="skeleton-grid" aria-hidden="true">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </div>
     </section>
+
+    <div id="runtime-grid" class="runtime-grid">
+      <section class="panel results-panel" aria-labelledby="results-heading">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Results view</p>
+            <h2 id="results-heading" tabindex="-1">Ranked results</h2>
+          </div>
+          <div class="answer-meta" aria-label="Current response metadata">
+            <span id="answer-type" class="pill">Ready to search</span>
+            <span id="result-count" class="pill">0 results</span>
+          </div>
+        </div>
+        <div id="results-list" class="results-list" role="list"></div>
+        <div id="empty-state" class="empty-state">
+          <div class="empty-icon" aria-hidden="true">⌕</div>
+          <h3>Start with a course code, department, keyword, or question.</h3>
+          <p>Try <strong>CSE 142</strong> for a specific course, <strong>machine learning</strong> for a topic, or choose a department to browse.</p>
+        </div>
+      </section>
+
+      <aside class="panel detail-panel" aria-labelledby="detail-heading" hidden>
+        <div class="panel-header panel-header--tight">
+          <div>
+            <p class="eyebrow">Course detail view</p>
+            <h2 id="detail-heading" tabindex="-1">Course detail</h2>
+          </div>
+          <span id="detail-route" class="route-pill">Course evidence</span>
+        </div>
+        <div id="detail-body" class="detail-body"></div>
+      </aside>
+    </div>
   </main>
 
-  <footer>
-    <p>Sources are indexed snapshots, not live UW systems. Freshness metadata is shown per result.</p>
+  <footer class="site-footer">
+    <p>Search uses indexed sources. Check the linked sources for catalog information.</p>
   </footer>
 
   <script src="app.js"></script>

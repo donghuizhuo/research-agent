@@ -83,3 +83,34 @@ def test_course_detail_returns_citations(client) -> None:
     data = response.json()
     assert data["course_id"] == "CSE-142"
     assert data["citations"]
+
+
+def test_followup_missing_course_clears_previous_results(client) -> None:
+    first = client.post('/course-search', json={'query': 'CSE 142'}).json()
+    reused = client.post('/course-search', json={
+        'query': 'CSE 999', 'workflow_id': first['workflow_id'],
+    }).json()
+    fresh = client.post('/course-search', json={'query': 'CSE 999'}).json()
+    assert reused['workflow_id'] == first['workflow_id']
+    assert reused['answer_type'] == fresh['answer_type'] == 'no_results'
+    assert reused['results'] == fresh['results'] == []
+    state = client.get(f"/workflows/{first['workflow_id']}").json()
+    assert state['active_query'] == 'CSE 999'
+    assert state['selected_courses'] == []
+    restored = client.post('/course-search', json={
+        'query': 'CSE 142', 'workflow_id': first['workflow_id'],
+    }).json()
+    assert len(restored['results']) == 1
+    assert not any('CSE-999' in note for note in restored['limitations'])
+
+
+def test_consecutive_discovery_searches_do_not_accumulate(client) -> None:
+    first = client.post('/course-search', json={'query': 'programming courses'}).json()
+    second = client.post('/course-search', json={
+        'query': 'intro programming courses', 'workflow_id': first['workflow_id'],
+    }).json()
+    fresh = client.post('/course-search', json={'query': 'intro programming courses'}).json()
+    assert second['workflow_id'] == first['workflow_id']
+    assert second['results'] == fresh['results']
+    assert [course['course_id'] for course in second['results']] == ['CSE-142']
+    assert len(second['results'][0]['citations']) == len(first['results'][0]['citations'])

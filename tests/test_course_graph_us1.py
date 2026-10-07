@@ -108,3 +108,28 @@ def test_checkpoint_state_persists(tmp_path) -> None:
     second = g.run("CSE 142", workflow_id="wf-check")
     assert first["workflow_id"] == second["workflow_id"] == "wf-check"
     assert (tmp_path / "checkpoints.sqlite3").exists()
+
+
+def test_query_reset_keeps_history_but_clears_retrieval_and_flags(graph) -> None:
+    from langchain_core.messages import HumanMessage
+    from courseagent.graph.checkpointer import thread_id_for
+
+    workflow = 'wf-reset-history'
+    first = graph.run('CSE 142', workflow_id=workflow)
+    app = graph.compile()
+    config = {'configurable': {'thread_id': thread_id_for(workflow)}}
+    app.update_state(config, {
+        'messages': [HumanMessage(content='prior conversation')],
+        'needs_clarification': True,
+        'interpreted_filters': {'department': 'CSE'},
+        'conflicts': [{'course_id': 'CSE-142', 'field': 'title'}],
+    })
+    missing = graph.run('CSE 999', workflow_id=workflow)
+    assert first['workflow_id'] == missing['workflow_id'] == workflow
+    assert missing['citations'] == missing['freshness'] == missing['conflicts'] == []
+    assert missing['needs_clarification'] is False
+    state = app.get_state(config).values
+    assert state['retrieved_courses'] == []
+    assert state['interpreted_filters'] == {}
+    assert state['messages'][0].content == 'prior conversation'
+    assert len(list(app.get_state_history(config))) > 1  # history was not deleted/replaced

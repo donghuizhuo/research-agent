@@ -8,6 +8,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from langgraph.types import Overwrite
+
 from config.default_config import DefaultConfig
 from courseagent.agents.schemas import CourseAnswer
 from courseagent.graph.checkpointer import CheckpointerManager, thread_id_for
@@ -67,7 +69,22 @@ class CourseResearchGraph:
         workflow_id = workflow_id or uuid.uuid4().hex
         app = self.compile()
         config = {"configurable": {"thread_id": thread_id_for(workflow_id)}}
-        state: dict[str, Any] = app.invoke({"query": query, "workflow_id": workflow_id}, config=config)
+        # Keep the workflow/checkpoint history, but each query owns its retrieval
+        # and answer state. Empty lists alone would append through the reducers.
+        initial = {
+            "query": query,
+            "workflow_id": workflow_id,
+            **{key: Overwrite([]) for key in (
+                "retrieved_courses", "citations", "freshness", "limitations", "conflicts",
+            )},
+            "interpreted_filters": Overwrite({}),
+            "intent": None,
+            "answer": None,
+            "structured_answer": None,
+            "needs_clarification": False,
+            "status": "active",
+        }
+        state: dict[str, Any] = app.invoke(initial, config=config)
 
         structured = state.get("structured_answer")
         if structured is not None and not isinstance(structured, dict):
