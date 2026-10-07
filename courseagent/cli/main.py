@@ -83,6 +83,8 @@ def ingest(
         """
         INSERT INTO snapshots (snapshot_id, created_at, refresh_mode, source_ids, status)
         VALUES (?, ?, 'manual', ?, 'indexed')
+        ON CONFLICT(snapshot_id) DO UPDATE SET
+            source_ids=excluded.source_ids, status=excluded.status
         """,
         (snapshot_id, utc_now(), json.dumps([r.source_id for r in results if r.stored])),
     )
