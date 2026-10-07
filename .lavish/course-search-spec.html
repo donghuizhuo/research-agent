@@ -1,245 +1,276 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" data-theme="luxury">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MVP UW Course Search Feature Spec</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    :where(.grid, .flex, .layout-grid, .layout-flex) > *,
-    :where([style*="display: grid"], [style*="display:grid"], [style*="display: flex"], [style*="display:flex"]) > * { min-width: 0; }
-    :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
-    :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
-    html { scroll-behavior: smooth; }
-    .flow-card { border: 1px solid color-mix(in oklab, currentColor 14%, transparent); }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Feature Spec: MVP UW Course Search</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *, :where([style*="display: grid"], [style*="display:flex"]) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  body { background: #0b0914; }
+  .gwt { display: inline-flex; align-items: center; gap: .25rem; font-weight: 600; font-size: .75rem; padding: .1rem .5rem; border-radius: .5rem; }
+  .gwt-given { background: #1d4ed8; color: #dbeafe; }
+  .gwt-when { background: #a16207; color: #fef9c3; }
+  .gwt-then { background: #15803d; color: #dcfce7; }
+</style>
 </head>
-<body class="bg-base-200 text-base-content">
-  <main class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-10">
-    <section class="hero rounded-box bg-base-100 shadow-xl">
-      <div class="hero-content w-full flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div class="max-w-3xl">
-          <div class="mb-3 flex flex-wrap gap-2">
-            <span class="badge badge-primary badge-lg">Spec Review</span>
-            <span class="badge badge-outline badge-lg">UW Seattle MVP</span>
-            <span class="badge badge-warning badge-lg">Draft</span>
-          </div>
-          <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">MVP UW Course Search</h1>
-          <p class="mt-4 text-lg opacity-85">A reviewable view of <span class="mono">specs/001-course-search/spec.md</span>: what users can do, what the system must guarantee, and how we will validate it.</p>
-        </div>
-        <div class="stats stats-vertical bg-base-200 shadow lg:stats-horizontal">
-          <div class="stat">
-            <div class="stat-title">Functional requirements</div>
-            <div class="stat-value text-primary">22</div>
-            <div class="stat-desc">MVP behavior rules</div>
-          </div>
-          <div class="stat">
-            <div class="stat-title">Success criteria</div>
-            <div class="stat-value text-secondary">8</div>
-            <div class="stat-desc">Measurable checks</div>
-          </div>
-          <div class="stat">
-            <div class="stat-title">Scope</div>
-            <div class="stat-value text-accent">SEA</div>
-            <div class="stat-desc">UW Seattle campus</div>
-          </div>
-        </div>
+<body class="min-h-screen">
+<main class="max-w-5xl mx-auto px-4 py-8 space-y-10">
+
+  <header class="space-y-4">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="badge badge-soft badge-secondary">branch 001-course-search</span>
+      <span class="badge badge-soft badge-warning">Status: Draft</span>
+      <span class="badge badge-soft badge-info">UW Seattle only</span>
+      <span class="badge badge-soft badge-success">Read-only</span>
+    </div>
+    <h1 class="text-4xl font-black leading-tight">Feature Specification: MVP UW Course Search</h1>
+    <p class="text-base-content/70 max-w-3xl">A read-only UW Seattle course research agent that searches approved indexed/snapshot sources and returns source-grounded answers with citations and freshness metadata.</p>
+    <div class="text-sm text-base-content/50">Created 2026-10-06 · Input: "Create the first MVP feature spec for course search."</div>
+  </header>
+
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-4">
+      <h2 class="text-2xl font-bold">Clarifications</h2>
+      <p class="text-sm text-base-content/70">Decisions recorded during the 2026-10-06 clarification session.</p>
+      <div class="space-y-3">
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> Which UW Seattle source coverage should v1 require?<br><span class="font-semibold text-success">A:</span> Official UW catalog/course descriptions and official UW department pages; no UW Time Schedule requirement for v1.</div>
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> Should natural-language course search be required for v1, or a stretch feature?<br><span class="font-semibold text-success">A:</span> Required in v1, limited to indexed/snapshot course-source search.</div>
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> What should the v1 user-facing surface be?<br><span class="font-semibold text-success">A:</span> Both a direct API and a simple Web UI.</div>
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> What snapshot refresh cadence should v1 assume?<br><span class="font-semibold text-success">A:</span> Manual refresh for MVP; scheduled refresh later.</div>
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> How strict should department-page extraction be?<br><span class="font-semibold text-success">A:</span> Strict: catalog/course descriptions own normalized facts; department pages are supporting context unless clearly structured.</div>
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> How should approved v1 sources be controlled?<br><span class="font-semibold text-success">A:</span> Explicit source registry with tiers, URL allowlists, extraction policies, and freshness requirements.</div>
+        <div class="p-4 rounded-box bg-base-200"><span class="font-semibold text-primary">Q:</span> Which initial source seed should v1 use?<br><span class="font-semibold text-success">A:</span> CSE and INFO catalog pages plus Allen School and UW Informatics department pages.</div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="mt-6 grid gap-4 lg:grid-cols-3">
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title">One-sentence user story</h2>
-          <p>As a UW Seattle course researcher, I can search by course code, department, keyword, or natural language and receive grounded course information with citations and clear uncertainty handling.</p>
-        </div>
-      </article>
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title">Retrieval rule</h2>
-          <p>Use structured UW course retrieval first. Open-ended web search is only a labeled fallback, not the default source of authority.</p>
-        </div>
-      </article>
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title">State rule</h2>
-          <p>Workflow state must explicitly persist active query, filters, selected courses, source IDs, citations, freshness, uncertainty, and task status.</p>
-        </div>
-      </article>
-    </section>
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-3">
+      <h2 class="text-2xl font-bold">Primary User Story</h2>
+      <blockquote class="border-l-4 border-primary pl-4 py-1 text-base-content/80">As a UW Seattle course researcher, I want to search for UW Seattle courses using course codes, departments, keywords, or natural-language questions so that I can quickly find grounded course information with citations and understand whether the information is current, missing, stale, or conflicting.</blockquote>
+    </div>
+  </section>
 
-    <section class="mt-8 card card-border bg-base-100 shadow-sm">
-      <div class="card-body">
-        <h2 class="card-title text-2xl">How the MVP answer should behave</h2>
-        <p class="opacity-80">This figure summarizes the intended user-facing flow from query to answer. Each box maps to requirements in the spec.</p>
-        <div class="mt-4 rounded-box bg-base-200 p-3">
-          <svg role="img" aria-labelledby="flow-title flow-desc" viewBox="0 0 1120 360" class="w-full">
-            <title id="flow-title">MVP course search flow</title>
-            <desc id="flow-desc">A user query is scoped to UW Seattle, resolved through structured retrieval, enriched with citations and state, then answered with uncertainty handling.</desc>
-            <defs>
-              <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" opacity="0.7"></path>
-              </marker>
-            </defs>
-            <g fill="none" stroke="currentColor" stroke-width="2" opacity="0.7" marker-end="url(#arrow)">
-              <path d="M190 105 H300"></path>
-              <path d="M470 105 H580"></path>
-              <path d="M750 105 H860"></path>
-              <path d="M670 160 V228"></path>
-              <path d="M250 262 H460"></path>
-              <path d="M660 262 H845"></path>
-            </g>
-            <g>
-              <rect id="query" x="30" y="55" width="160" height="100" rx="18" class="fill-base-100 stroke-primary" stroke-width="3"></rect>
-              <text x="110" y="94" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor">User query</text>
-              <text x="110" y="124" text-anchor="middle" font-size="14" fill="currentColor" opacity="0.75">code / dept / keyword</text>
-            </g>
-            <g>
-              <rect id="scope" x="300" y="55" width="170" height="100" rx="18" class="fill-base-100 stroke-accent" stroke-width="3"></rect>
-              <text x="385" y="94" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor">Scope gate</text>
-              <text x="385" y="124" text-anchor="middle" font-size="14" fill="currentColor" opacity="0.75">UW Seattle only</text>
-            </g>
-            <g>
-              <rect id="retrieve" x="580" y="55" width="170" height="100" rx="18" class="fill-base-100 stroke-secondary" stroke-width="3"></rect>
-              <text x="665" y="92" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor">Retrieve</text>
-              <text x="665" y="122" text-anchor="middle" font-size="14" fill="currentColor" opacity="0.75">structured first</text>
-            </g>
-            <g>
-              <rect id="answer" x="860" y="55" width="220" height="100" rx="18" class="fill-base-100 stroke-success" stroke-width="3"></rect>
-              <text x="970" y="90" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor">Answer</text>
-              <text x="970" y="122" text-anchor="middle" font-size="14" fill="currentColor" opacity="0.75">facts + citations + limits</text>
-            </g>
-            <g>
-              <rect id="state" x="460" y="220" width="200" height="84" rx="18" class="fill-base-100 stroke-info" stroke-width="3"></rect>
-              <text x="560" y="252" text-anchor="middle" font-size="19" font-weight="700" fill="currentColor">Workflow state</text>
-              <text x="560" y="280" text-anchor="middle" font-size="14" fill="currentColor" opacity="0.75">query, filters, sources</text>
-            </g>
-            <g>
-              <rect id="validate" x="845" y="220" width="235" height="84" rx="18" class="fill-base-100 stroke-warning" stroke-width="3"></rect>
-              <text x="962" y="252" text-anchor="middle" font-size="19" font-weight="700" fill="currentColor">Validation suite</text>
-              <text x="962" y="280" text-anchor="middle" font-size="14" fill="currentColor" opacity="0.75">tests for major features</text>
-            </g>
-          </svg>
-        </div>
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">Acceptance Scenarios</h2>
+    <div class="space-y-3">
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">1</span><span class="font-semibold">Exact course-code lookup</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user asks for a specific course by course code, <span class="gwt gwt-when">When</span> the course exists in structured data, <span class="gwt gwt-then">Then</span> the system returns title, department, course number, credits and description when available, plus citations.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">2</span><span class="font-semibold">Department / keyword search</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user searches by department or keyword, <span class="gwt gwt-when">When</span> matching courses exist, <span class="gwt gwt-then">Then</span> the system returns a concise ranked list with enough information to choose a course.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">3</span><span class="font-semibold">Natural-language discovery</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user asks a natural-language course discovery question, <span class="gwt gwt-when">When</span> it can be answered from approved indexed/snapshot sources, <span class="gwt gwt-then">Then</span> the system returns a cited, ranked answer without personalized advising or unsupported inferences.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">4</span><span class="font-semibold">Prerequisites</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user asks about prerequisites, <span class="gwt gwt-when">When</span> information is available in retrieved sources, <span class="gwt gwt-then">Then</span> the system returns it with citations and does not infer missing prerequisites.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">5</span><span class="font-semibold">Quarter availability (confirmed)</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user asks about a quarter, <span class="gwt gwt-when">When</span> quarter-specific data is available in snapshot sources, <span class="gwt gwt-then">Then</span> the system answers with freshness and citations and notes it is not a live check.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">6</span><span class="font-semibold">Quarter availability (unconfirmed)</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user asks about a quarter, <span class="gwt gwt-when">When</span> quarter-specific data is not available, <span class="gwt gwt-then">Then</span> the system states it cannot confirm and does not imply live-system access.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">7</span><span class="font-semibold">No authoritative web fallback</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> structured retrieval misses, <span class="gwt gwt-when">When</span> web search is not explicitly requested, <span class="gwt gwt-then">Then</span> the system does not present generic web results as authoritative facts.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">8</span><span class="font-semibold">Conflict surfacing</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> sources conflict, <span class="gwt gwt-when">When</span> it affects the answer, <span class="gwt gwt-then">Then</span> the system surfaces the conflict and identifies sources instead of silently choosing one.</p>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4 gap-2">
+        <div class="flex items-center gap-2"><span class="badge badge-neutral">9</span><span class="font-semibold">Sensitive data</span></div>
+        <p class="text-sm text-base-content/80"><span class="gwt gwt-given">Given</span> a user provides sensitive student information, <span class="gwt gwt-when">When</span> it is not needed for search, <span class="gwt gwt-then">Then</span> the system avoids storing/using it and responds without requiring private data.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-3">
+      <h2 class="text-2xl font-bold">Edge Cases</h2>
+      <ul class="list-disc list-inside space-y-1.5 text-sm text-base-content/80">
+        <li>Invalid or nonexistent course code.</li>
+        <li>Ambiguous course code or department abbreviation.</li>
+        <li>Course title matching multiple departments.</li>
+        <li>Informal terms such as "easy stats class" or "machine learning intro."</li>
+        <li>Requests for live enrollment, seats, registration status, instructor, or schedule when unavailable or live-only.</li>
+        <li>Natural-language requests needing personalized advising, official verification, or unsupported inference.</li>
+        <li>Information outside UW Seattle data or Seattle campus scope.</li>
+        <li>Follow-up questions depending on prior filters or selected courses.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="text-2xl font-bold">Functional Requirements</h2>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Scope &amp; search modes</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-001</span> Limit scope to UW Seattle campus courses.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-002</span> Search by exact course code.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-003</span> Search by department.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-004</span> Search by keyword in title/description/indexed text.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-005</span> Natural-language discovery, limited to retrieval/ranking over approved sources.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Returned facts</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-006</span> Return title, department, course number, description when available.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-007</span> Return credits when available.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-008</span> Return prerequisites/corequisites only when source-supported.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-008a</span> No personalized advising or unsupported requirement claims from NL search.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Citations &amp; sourcing</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-009</span> Include citations for substantive course facts.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-010</span> State when a requested fact is unavailable.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-011</span> Prefer structured retrieval before open-ended web search.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-011a</span> Include catalog/course descriptions and department pages in v1 coverage.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-012</span> Clearly label any answer using open-ended web search.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Freshness &amp; availability</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-013</span> Track/expose freshness metadata (quarter, year, source/index timestamp).</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-014</span> Never claim quarter offering unless snapshot confirms it.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-015</span> No dependency on live UW systems or real-time availability.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-016</span> Communicate that live enrollment/seats/registration/schedule are out of scope for v1.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Conflicts &amp; provenance</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-017</span> Surface material conflicts between sources.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-018</span> Distinguish official vs user-provided/inferred/unofficial information.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Workflow state</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-019</span> Maintain explicit workflow state (query, filters, courses, sources, citations, freshness, uncertainty, status).</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-020</span> No hidden/global variables or untracked implicit memory.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Privacy &amp; safety</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-021</span> Avoid requesting/storing/using sensitive student information.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-022</span> Read-only; no enrollment, registration, payment, grade, or record actions.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-023</span> User-facing messages for invalid, ambiguous, missing, stale, conflicting, out-of-scope, or live-only cases.</li>
+      </ul>
+    </div></div>
+
+    <div class="card card-border bg-base-100"><div class="card-body p-5 gap-2">
+      <h3 class="font-semibold text-primary">Validation &amp; surfaces</h3>
+      <ul class="space-y-1.5 text-sm">
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-024</span> Repeatable tests/validation for major capabilities.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-025</span> Expose search via both a direct API and a simple Web UI.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-026</span> Manual snapshot refresh for MVP; keep scheduled-refresh compatibility.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-027</span> Catalog/course descriptions are the primary fact source; department pages support context or clearly-structured cited facts.</li>
+        <li><span class="badge badge-ghost badge-sm font-mono">FR-028</span> Control ingestion via an explicit source registry (tier, type, authority, URLs, policy, freshness).</li>
+      </ul>
+    </div></div>
+  </section>
+
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-4">
+      <h2 class="text-2xl font-bold">Key Entities</h2>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div class="p-4 rounded-box bg-base-200"><div class="font-semibold">Course</div><p class="text-sm text-base-content/70">UW Seattle course by department and number; title, description, credits, prerequisites, metadata.</p></div>
+        <div class="p-4 rounded-box bg-base-200"><div class="font-semibold">Course Source</div><p class="text-sm text-base-content/70">Catalog record, course description, department page, approved snapshot, or user document.</p></div>
+        <div class="p-4 rounded-box bg-base-200"><div class="font-semibold">Citation</div><p class="text-sm text-base-content/70">Links an answer claim to a source: ID, URL, title, retrieval timestamp, evidence.</p></div>
+        <div class="p-4 rounded-box bg-base-200"><div class="font-semibold">Freshness Metadata</div><p class="text-sm text-base-content/70">Quarter, year, publication/index/retrieval timestamp.</p></div>
+        <div class="p-4 rounded-box bg-base-200"><div class="font-semibold">Search Query</div><p class="text-sm text-base-content/70">Current request text and interpreted filters.</p></div>
+        <div class="p-4 rounded-box bg-base-200"><div class="font-semibold">Workflow State</div><p class="text-sm text-base-content/70">Inspectable persisted state: query, filters, courses, sources, citations, uncertainty, status.</p></div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="mt-8 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-2xl">Acceptance scenarios</h2>
-          <ol class="list-decimal space-y-3 pl-5">
-            <li>Exact course lookup returns title, department, number, credits, description, and citations when available.</li>
-            <li>Department or keyword search returns a concise ranked list of relevant courses.</li>
-            <li>Natural-language questions are interpreted and answered from structured course data when possible.</li>
-            <li>Prerequisites are returned only when supported by retrieved sources.</li>
-            <li>Quarter availability is answered only when quarter-specific data is available.</li>
-            <li>If availability data is missing, the system says it cannot confirm availability.</li>
-            <li>If structured retrieval lacks the answer, generic web snippets are not treated as authoritative.</li>
-            <li>Source conflicts are surfaced with source identities.</li>
-            <li>Sensitive student data is not required, stored, or used for MVP course search.</li>
-          </ol>
-        </div>
-      </article>
-
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-2xl">Key entities</h2>
-          <div class="overflow-x-auto rounded-box border border-base-content/10">
-            <table class="table table-zebra">
-              <thead><tr><th>Entity</th><th>Meaning in MVP</th></tr></thead>
-              <tbody>
-                <tr><td class="font-semibold">Course</td><td>UW Seattle course identified by department and number.</td></tr>
-                <tr><td class="font-semibold">Course Source</td><td>Official/catalog/schedule/department/local/user-provided source for course facts.</td></tr>
-                <tr><td class="font-semibold">Citation</td><td>Reference connecting an answer claim to a source.</td></tr>
-                <tr><td class="font-semibold">Freshness Metadata</td><td>Quarter, year, publication date, index timestamp, or retrieval timestamp.</td></tr>
-                <tr><td class="font-semibold">Search Query</td><td>User text plus interpreted filters.</td></tr>
-                <tr><td class="font-semibold">Workflow State</td><td>Persisted query, assumptions, filters, courses, sources, citations, uncertainty, and status.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </article>
-    </section>
-
-    <section class="mt-8 card card-border bg-base-100 shadow-sm">
-      <div class="card-body">
-        <h2 class="card-title text-2xl">Functional requirements matrix</h2>
-        <p class="opacity-80">Grouped for review. The source spec contains the full numbered list.</p>
-        <div class="overflow-x-auto rounded-box border border-base-content/10">
-          <table class="table table-zebra table-sm">
-            <thead>
-              <tr><th>Group</th><th>Requirement IDs</th><th>What must be true</th><th>Review focus</th></tr>
-            </thead>
-            <tbody>
-              <tr><td><span class="badge badge-accent">Scope</span></td><td class="mono">FR-001</td><td>MVP is limited to UW Seattle campus courses.</td><td>Confirm Seattle-only is correct.</td></tr>
-              <tr><td><span class="badge badge-primary">Search</span></td><td class="mono">FR-002–FR-005</td><td>Search by code, department, keyword, and natural language.</td><td>Decide whether natural language is required for v1.</td></tr>
-              <tr><td><span class="badge badge-secondary">Facts</span></td><td class="mono">FR-006–FR-010</td><td>Return available title, number, description, credits, prerequisites, citations, and unavailable-data messages.</td><td>Define minimum source coverage.</td></tr>
-              <tr><td><span class="badge badge-info">Retrieval</span></td><td class="mono">FR-011–FR-016</td><td>Prefer structured retrieval, label web fallback, track freshness, avoid unsupported offering claims, surface conflicts, distinguish source types.</td><td>Clarify “don’t live” / snapshot-only policy.</td></tr>
-              <tr><td><span class="badge badge-warning">State</span></td><td class="mono">FR-017–FR-018</td><td>Persist explicit workflow state and avoid hidden globals or implicit memory dependencies.</td><td>Define state fields in plan.</td></tr>
-              <tr><td><span class="badge badge-error">Safety</span></td><td class="mono">FR-019–FR-021</td><td>Avoid sensitive student data, remain read-only, handle invalid/ambiguous/stale/conflicting/out-of-scope cases.</td><td>Ensure no private UW actions.</td></tr>
-              <tr><td><span class="badge badge-success">Validation</span></td><td class="mono">FR-022</td><td>Major course search capabilities require repeatable tests or validation procedures.</td><td>Define validation suite before implementation.</td></tr>
-            </tbody>
-          </table>
-        </div>
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-4">
+      <h2 class="text-2xl font-bold">Success Criteria</h2>
+      <div class="overflow-x-auto rounded-box border border-base-content/5">
+        <table class="table table-zebra">
+          <thead><tr><th>ID</th><th>Target</th><th>Criterion</th></tr></thead>
+          <tbody>
+            <tr><td class="font-mono">SC-001</td><td class="font-semibold whitespace-nowrap">≥ 95%</td><td>Exact course-code searches return the correct course when it exists.</td></tr>
+            <tr><td class="font-mono">SC-002</td><td class="font-semibold whitespace-nowrap">≥ 90%</td><td>Keyword/department/NL searches return a relevant course in the top five when relevant courses exist.</td></tr>
+            <tr><td class="font-mono">SC-003</td><td class="font-semibold whitespace-nowrap">100%</td><td>Answers with substantive facts include a citation or state no source is available.</td></tr>
+            <tr><td class="font-mono">SC-004</td><td class="font-semibold whitespace-nowrap">100%</td><td>Unavailable quarter-offering cases avoid claiming availability or live status.</td></tr>
+            <tr><td class="font-mono">SC-005</td><td class="font-semibold whitespace-nowrap">100%</td><td>Missing/conflicting required facts communicate the limitation or conflict.</td></tr>
+            <tr><td class="font-mono">SC-006</td><td class="font-semibold whitespace-nowrap">100%</td><td>Workflows preserve required state fields across multi-step interactions.</td></tr>
+            <tr><td class="font-mono">SC-007</td><td class="font-semibold whitespace-nowrap">100%</td><td>Major capabilities have repeatable tests or documented validation.</td></tr>
+            <tr><td class="font-mono">SC-008</td><td class="font-semibold whitespace-nowrap">≤ 2 interactions</td><td>Basic course lookup completes when the code is known and the course exists.</td></tr>
+            <tr><td class="font-mono">SC-009</td><td class="font-semibold whitespace-nowrap">both surfaces</td><td>API and Web UI complete lookup/search/detail using the same data and citation requirements.</td></tr>
+          </tbody>
+        </table>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="mt-8 grid gap-6 lg:grid-cols-2">
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-2xl">Success criteria</h2>
-          <div class="space-y-3">
-            <div><div class="flex justify-between gap-3"><span>Exact code search accuracy</span><strong>95%</strong></div><progress class="progress progress-primary" value="95" max="100"></progress></div>
-            <div><div class="flex justify-between gap-3"><span>Keyword/dept relevance in top 5</span><strong>90%</strong></div><progress class="progress progress-secondary" value="90" max="100"></progress></div>
-            <div><div class="flex justify-between gap-3"><span>Substantive answers cite or disclose no source</span><strong>100%</strong></div><progress class="progress progress-success" value="100" max="100"></progress></div>
-            <div><div class="flex justify-between gap-3"><span>Missing/conflicting facts handled clearly</span><strong>100%</strong></div><progress class="progress progress-warning" value="100" max="100"></progress></div>
-            <div><div class="flex justify-between gap-3"><span>Major MVP capabilities validated</span><strong>100%</strong></div><progress class="progress progress-info" value="100" max="100"></progress></div>
-          </div>
-        </div>
-      </article>
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-3">
+      <h2 class="text-2xl font-bold">Assumptions</h2>
+      <ul class="list-disc list-inside space-y-1.5 text-sm text-base-content/80">
+        <li>Limited to UW Seattle campus and publicly available or approved information.</li>
+        <li>Other campuses out of scope unless in approved Seattle sources.</li>
+        <li>Read-only; no interaction with private UW registration/advising/grade/payment/record systems.</li>
+        <li>Initial seed: UW CSE Catalog, Allen School, UW INFO Catalog, UW Informatics (in <code class="text-primary">config/sources.yml</code>).</li>
+        <li>Catalog/course descriptions are the primary fact source; department pages are supporting context unless clearly structured and cited.</li>
+        <li>UW Time Schedule not required for v1 unless provided as approved snapshot data.</li>
+        <li>Structured retrieval sources available or created before release.</li>
+        <li>Approved indexed/snapshot data only; no live UW dependency.</li>
+        <li>Manual snapshot refresh for MVP; scheduled refresh deferred.</li>
+        <li>Quarter-specific availability supported only when snapshot data exists.</li>
+        <li>Live enrollment, seats, registration status, and schedule changes out of scope for v1.</li>
+        <li>Open-ended web search is a fallback, not the default path.</li>
+        <li>First release may support a limited source set with clear coverage communication.</li>
+      </ul>
+    </div>
+  </section>
 
-      <article class="card card-border bg-base-100 shadow-sm">
-        <div class="card-body">
-          <h2 class="card-title text-2xl">Open clarification topics</h2>
-          <div class="alert alert-warning">
-            <span><strong>Important:</strong> Your note “don’t live” is not yet reflected in the spec. It likely means the MVP should use snapshot/indexed data rather than live UW systems.</span>
-          </div>
-          <ul class="mt-4 list-disc space-y-2 pl-5">
-            <li>Exact v1 source coverage: catalog only, time schedule snapshot, department pages, or a curated dataset?</li>
-            <li>Whether quarter-specific availability is required at launch or only supported when snapshot data exists.</li>
-            <li>Whether natural-language search is required for MVP or can be a stretch capability.</li>
-            <li>Whether to explicitly state: “No live data dependency for v1.”</li>
-          </ul>
-        </div>
-      </article>
-    </section>
-
-    <section class="mt-8 card card-border bg-base-100 shadow-sm">
-      <div class="card-body">
-        <h2 class="card-title text-2xl">Constitution alignment</h2>
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Accuracy</strong><p class="mt-1 text-sm opacity-80">Grounded course facts; no invention.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Citations</strong><p class="mt-1 text-sm opacity-80">Substantive claims trace to sources.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Structured first</strong><p class="mt-1 text-sm opacity-80">Web search is labeled fallback only.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Freshness</strong><p class="mt-1 text-sm opacity-80">Quarter/year/timestamp when available.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Privacy</strong><p class="mt-1 text-sm opacity-80">No unnecessary sensitive student data.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Explicit state</strong><p class="mt-1 text-sm opacity-80">No hidden globals for workflow correctness.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Validation</strong><p class="mt-1 text-sm opacity-80">Major features require repeatable tests.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Read-only</strong><p class="mt-1 text-sm opacity-80">No enrollment or restricted UW actions.</p></div>
-          <div class="flow-card rounded-box bg-base-200 p-4"><strong>Robustness</strong><p class="mt-1 text-sm opacity-80">Missing, stale, conflicting data surfaced.</p></div>
-        </div>
+  <section class="card card-border bg-base-100">
+    <div class="card-body p-6 gap-3">
+      <h2 class="text-2xl font-bold">Constitution Alignment</h2>
+      <div class="grid sm:grid-cols-2 gap-2">
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Source-Grounded Academic Accuracy</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Citation and Traceability by Default</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Structured Retrieval Before Web Search</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Freshness and Temporal Awareness</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Privacy and Student Data Protection</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Robustness Against Stale/Conflicting/Missing Data</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Persistent and Explicit Workflow State</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Major Feature Testability and Validation</div>
+        <div class="flex items-center gap-2 text-sm"><span class="badge badge-success badge-xs">✓</span> Ethical Automation Boundaries</div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <footer class="mt-8 flex flex-col gap-3 rounded-box bg-base-100 p-5 text-sm opacity-80 sm:flex-row sm:items-center sm:justify-between">
-      <span>Artifact generated from <span class="mono">specs/001-course-search/spec.md</span></span>
-      <span>Design source: Lavish DaisyUI/Tailwind fallback; this repo has no app design system yet.</span>
-    </footer>
-  </main>
+  <footer class="text-sm text-base-content/50">Annotate any section to queue feedback back to the agent.</footer>
+</main>
 </body>
 </html>

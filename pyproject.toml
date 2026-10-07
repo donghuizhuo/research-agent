@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "uw-course-research-agent"
+version = "0.1.0"
+description = "Read-only UW Seattle course research agent over approved indexed snapshots."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "langgraph",
+  "langchain-core",
+  "langchain-openai",
+  "langgraph-checkpoint-sqlite",
+  "fastapi",
+  "uvicorn",
+  "typer",
+  "pydantic",
+  "httpx",
+  "beautifulsoup4",
+  "python-dotenv",
+  "rich",
+  "PyYAML",
+]
+
+[project.scripts]
+courseagent = "courseagent.cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["courseagent"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-subtests",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

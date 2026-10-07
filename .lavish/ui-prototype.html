@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="corporate">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UW Course Research Agent — UI Prototype</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > *, :where([style*="display: grid"], [style*="display:flex"]) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, h5, h6, li, dd, blockquote, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  :where(img, svg, video, canvas, iframe) { max-width: 100%; height: auto; }
+  [data-theme="corporate"] { --color-primary: #4b2e83; --color-primary-content: #ffffff; --color-secondary: #85754d; }
+  body { min-height: 100vh; }
+</style>
+</head>
+<body class="bg-base-200">
+
+<nav class="navbar bg-base-100 border-b border-base-300 sticky top-0 z-30 shadow-sm">
+  <div class="navbar-start gap-2">
+    <span class="badge badge-primary text-white">UW</span>
+    <span class="text-lg font-bold tracking-tight">Course Research Agent</span>
+    <span class="badge badge-ghost badge-sm hidden sm:inline-flex">MVP prototype</span>
+  </div>
+  <div class="navbar-end">
+    <div class="text-right text-xs leading-tight text-base-content/60">
+      <div class="font-mono">workflow: <span id="wf-id" class="text-base-content">—</span></div>
+      <div>checkpointed session</div>
+    </div>
+  </div>
+</nav>
+
+<div role="alert" class="alert alert-warning rounded-none border-b border-warning/30 py-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3.79a.5.5 0 0 1-1 0V4.5A.5.5 0 0 1 8 4zM8 10a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>
+  <span class="text-sm">Results come from <strong>approved indexed/snapshot sources</strong>. No live enrollment, seat availability, registration status, or schedule changes.</span>
+</div>
+
+<main class="max-w-4xl mx-auto px-4 py-10 space-y-8">
+
+  <section class="space-y-3">
+    <h1 class="text-3xl font-black tracking-tight">Search UW Seattle courses</h1>
+    <p class="text-base-content/60 text-sm max-w-2xl">Search by course code, department, keyword, or a natural-language question. Answers are source-grounded with citations and freshness metadata.</p>
+    <form id="search-form" class="flex flex-col sm:flex-row gap-2">
+      <input id="query" type="text" placeholder="e.g. CSE 142, CSE, intro programming, machine learning" class="input input-bordered flex-1" autocomplete="off" aria-label="Search query">
+      <select id="dept" class="select select-bordered sm:w-40" aria-label="Department filter">
+        <option value="">All departments</option>
+        <option value="CSE">CSE</option>
+        <option value="INFO">INFO</option>
+      </select>
+      <button type="submit" class="btn btn-primary">Search</button>
+    </form>
+    <div class="flex flex-wrap gap-2">
+      <button class="chip btn btn-xs btn-outline">CSE 142</button>
+      <button class="chip btn btn-xs btn-outline">CSE</button>
+      <button class="chip btn btn-xs btn-outline">intro programming</button>
+      <button class="chip btn btn-xs btn-outline">machine learning</button>
+      <button class="chip btn btn-xs btn-outline">how many seats are open in CSE 142?</button>
+    </div>
+  </section>
+
+  <section id="notice" class="hidden"></section>
+
+  <section id="results" class="space-y-3"></section>
+
+  <section id="empty" class="hidden">
+    <div class="card card-border bg-base-100">
+      <div class="card-body items-center text-center py-12 gap-2">
+        <h2 class="text-xl font-bold">Start searching</h2>
+        <p class="text-sm text-base-content/60 max-w-md">Try an exact code like <span class="font-mono">CSE 142</span>, a department like <span class="font-mono">INFO</span>, or a natural-language query like <span class="font-mono">intro programming</span>.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="border-t border-base-300 bg-base-100 mt-8">
+  <div class="max-w-4xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/50">
+    <span>Prototype for review · data is illustrative, not real UW records</span>
+    <span>Read-only · UW Seattle · CSE + INFO seed</span>
+  </div>
+</footer>
+
+<dialog id="detail-modal" class="modal">
+  <div class="modal-box max-w-2xl" id="detail-content"></div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<script>
+const COURSES = [
+  {
+    id: "CSE-142", dept: "CSE", num: "142", title: "Computer Programming I", credits: "4",
+    desc: "Basic programming-in-the-small abilities and concepts including procedural programming, methods, parameters, arrays, objects, and functional decomposition using the Java programming language.",
+    prereqs: null, coreqs: null,
+    conflicts: [],
+    citations: [
+      { field: "description", source: "UW CSE Catalog", url: "https://www.washington.edu/students/crscat/cse.html", evidence: "Basic programming-in-the-small abilities and concepts including procedural programming…", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" }
+    ]
+  },
+  {
+    id: "CSE-143", dept: "CSE", num: "143", title: "Computer Programming II", credits: "5",
+    desc: "Continuation of CSE 142. Abstract data types and their implementations, object-oriented design, interfaces, recursion, collections, and basic algorithm analysis.",
+    prereqs: "CSE 142", coreqs: null,
+    conflicts: [],
+    citations: [
+      { field: "description", source: "UW CSE Catalog", url: "https://www.washington.edu/students/crscat/cse.html", evidence: "Continuation of CSE 142. Abstract data types and their implementations…", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" },
+      { field: "prerequisites", source: "UW CSE Catalog", url: "https://www.washington.edu/students/crscat/cse.html", evidence: "Prerequisite: CSE 142", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" }
+    ]
+  },
+  {
+    id: "CSE-446", dept: "CSE", num: "446", title: "Machine Learning", credits: "4",
+    desc: "Introduction to machine learning: supervised and unsupervised learning, model evaluation, and practical methods with real datasets.",
+    prereqs: "CSE 332", coreqs: null,
+    conflicts: [],
+    citations: [
+      { field: "description", source: "UW CSE Catalog", url: "https://www.washington.edu/students/crscat/cse.html", evidence: "Introduction to machine learning: supervised and unsupervised learning…", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" }
+    ]
+  },
+  {
+    id: "INFO-200", dept: "INFO", num: "200", title: "Intellectual Foundations of Informatics", credits: "5",
+    desc: "Introduces the intellectual foundations of information, information science, and the information professions.",
+    prereqs: null, coreqs: null,
+    conflicts: [],
+    citations: [
+      { field: "description", source: "UW INFO Catalog", url: "https://www.washington.edu/students/crscat/info.html", evidence: "Introduces the intellectual foundations of information…", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" }
+    ]
+  },
+  {
+    id: "INFO-201", dept: "INFO", num: "201", title: "Foundational Skills for Data Science", credits: "5",
+    desc: "Introduces foundational tools and techniques for working with data: version control, programming, data wrangling, and reproducible workflows.",
+    prereqs: null, coreqs: null,
+    conflicts: [
+      { field: "credits", a: { value: "5", source: "UW INFO Catalog" }, b: { value: "4", source: "UW Informatics dept page" } }
+    ],
+    citations: [
+      { field: "description", source: "UW INFO Catalog", url: "https://www.washington.edu/students/crscat/info.html", evidence: "Introduces foundational tools and techniques for working with data…", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" },
+      { field: "credits", source: "UW Informatics dept page", url: "https://ischool.uw.edu/programs/informatics", evidence: "INFO 201 is a 4-credit course", snapshot: "uw_dept_info_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" }
+    ]
+  },
+  {
+    id: "INFO-340", dept: "INFO", num: "340", title: "Client-Side Development", credits: "5",
+    desc: "Design and development of interactive client-side web applications, including HTML, CSS, JavaScript, and frameworks.",
+    prereqs: "CSE 142 or CSE 160", coreqs: null,
+    conflicts: [],
+    citations: [
+      { field: "description", source: "UW INFO Catalog", url: "https://www.washington.edu/students/crscat/info.html", evidence: "Design and development of interactive client-side web applications…", snapshot: "uw_catalog_2026_10_06", retrieved: "2026-10-06T00:00:00Z", indexed: "2026-10-06T00:05:00Z" }
+    ]
+  }
+];
+
+const LIVE_RE = /\b(seat|seats|enroll|enrollment|registration|instructor|schedule|waitlist|capacity|open spots|available now)\b/i;
+let workflowId = null;
+
+function newWorkflow() {
+  workflowId = "wf_" + Math.random().toString(36).slice(2, 10);
+  document.getElementById("wf-id").textContent = workflowId;
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
+function matches(c, q) {
+  const hay = [c.id, c.dept, c.num, c.title, c.desc].join(" ").toLowerCase();
+  return q.split(/\s+/).every(t => hay.includes(t));
+}
+
+function score(c, q) {
+  const title = c.title.toLowerCase();
+  const desc = c.desc.toLowerCase();
+  let s = 0;
+  if (title.includes(q)) s += 3;
+  if (c.id.toLowerCase().replace("-", "").includes(q.replace(/\s/g, ""))) s += 5;
+  if (desc.includes(q)) s += 1;
+  return s;
+}
+
+function renderResults(courses, q) {
+  const box = document.getElementById("results");
+  const empty = document.getElementById("empty");
+  if (!courses.length) { box.innerHTML = ""; empty.classList.remove("hidden"); return; }
+  empty.classList.add("hidden");
+  box.innerHTML = `
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold">${courses.length} result${courses.length>1?"s":""}</h2>
+      <span class="text-xs text-base-content/50">snapshot: uw_catalog_2026_10_06</span>
+    </div>
+    ${courses.map(c => {
+      const conflict = c.conflicts.length ? `<span class="badge badge-warning badge-sm">${c.conflicts.length} conflict</span>` : "";
+      return `
+      <button class="card card-border bg-base-100 w-full text-left hover:border-primary transition-colors" onclick="openDetail('${c.id}')">
+        <div class="card-body p-5 gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="badge badge-primary text-white">${esc(c.id)}</span>
+              <span class="badge badge-outline">${esc(c.dept)}</span>
+              ${conflict}
+            </div>
+            <span class="text-xs text-base-content/50">${esc(c.credits)} credits</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight">${esc(c.title)}</h3>
+          <p class="text-sm text-base-content/70 line-clamp-2">${esc(c.desc)}</p>
+          <div class="flex items-center gap-3 text-xs text-base-content/50 pt-1">
+            <span>🔗 ${c.citations.length} citation${c.citations.length>1?"s":""}</span>
+            <span>🕒 indexed 2026-10-06</span>
+          </div>
+        </div>
+      </button>`;
+    }).join("")}
+  `;
+}
+
+function citationBlock(c) {
+  return `
+    <div class="collapse collapse-arrow bg-base-200 rounded-box">
+      <input type="checkbox" aria-label="Toggle citation"/>
+      <div class="collapse-title text-sm font-semibold py-2.5">${esc(c.source)} · ${esc(c.field)}</div>
+      <div class="collapse-content text-sm space-y-1 text-base-content/80">
+        <div><span class="font-semibold">URL:</span> <a class="link link-primary" href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.url)}</a></div>
+        <div><span class="font-semibold">Evidence:</span> “${esc(c.evidence)}”</div>
+        <div class="font-mono text-xs text-base-content/50">snapshot ${esc(c.snapshot)} · retrieved ${esc(c.retrieved)} · indexed ${esc(c.indexed)}</div>
+      </div>
+    </div>`;
+}
+
+function openDetail(id) {
+  const c = COURSES.find(x => x.id === id);
+  if (!c) return;
+  const conflictHtml = c.conflicts.map(cf => `
+    <div role="alert" class="alert alert-warning py-2 text-sm">
+      <span>⚠️ Conflict on <strong>${esc(cf.field)}</strong>: “${esc(cf.a.value)}” (${esc(cf.a.source)}) vs “${esc(cf.b.value)}” (${esc(cf.b.source)}).</span>
+    </div>`).join("");
+  document.getElementById("detail-content").innerHTML = `
+    <h3 class="text-2xl font-black tracking-tight">${esc(c.id)} · ${esc(c.title)}</h3>
+    <div class="flex flex-wrap items-center gap-2 mt-2">
+      <span class="badge badge-outline">${esc(c.dept)}</span>
+      <span class="badge badge-outline">${esc(c.credits)} credits</span>
+    </div>
+    ${conflictHtml}
+    <div class="divider my-3"></div>
+    <dl class="space-y-4 text-sm">
+      <div>
+        <dt class="font-semibold text-base-content/70">Description</dt>
+        <dd class="mt-1 text-base-content/90">${esc(c.desc)}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-base-content/70">Prerequisites</dt>
+        <dd class="mt-1">${c.prereqs ? esc(c.prereqs) : '<span class="text-base-content/50 italic">Unavailable from indexed sources</span>'}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-base-content/70">Corequisites</dt>
+        <dd class="mt-1">${c.coreqs ? esc(c.coreqs) : '<span class="text-base-content/50 italic">Unavailable from indexed sources</span>'}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-base-content/70">Freshness</dt>
+        <dd class="mt-1 font-mono text-xs text-base-content/60">snapshot uw_catalog_2026_10_06 · indexed 2026-10-06</dd>
+      </div>
+    </dl>
+    <div class="divider my-3"></div>
+    <h4 class="font-semibold mb-2">Citations (${c.citations.length})</h4>
+    <div class="space-y-2">${c.citations.map(citationBlock).join("")}</div>
+    <div class="modal-action">
+      <button class="btn btn-sm" onclick="document.getElementById('detail-modal').close()">Close</button>
+    </div>`;
+  document.getElementById("detail-modal").showModal();
+}
+
+function handleSearch(rawQ, dept) {
+  if (!workflowId) newWorkflow();
+  const q = (rawQ || "").trim();
+  const notice = document.getElementById("notice");
+  notice.classList.add("hidden"); notice.innerHTML = "";
+
+  if (!q) { renderResults([], q); return; }
+
+  if (LIVE_RE.test(q)) {
+    notice.innerHTML = `
+      <div role="alert" class="alert alert-warning">
+        <span>⚠️ <strong>Live data is out of scope.</strong> Seat availability, enrollment, registration status, instructor, and schedule changes are not available from snapshot sources. No live UW systems are queried.</span>
+      </div>`;
+    notice.classList.remove("hidden");
+    renderResults([], q);
+    return;
+  }
+
+  // exact code match
+  const code = q.match(/([A-Za-z]{2,5})\s*(\d{3})/);
+  let results = [];
+  if (code) {
+    const id = code[1].toUpperCase() + "-" + code[2];
+    results = COURSES.filter(c => c.id === id);
+  } else if (/^[A-Za-z]{2,5}$/.test(q)) {
+    results = COURSES.filter(c => c.dept === q.toUpperCase());
+  } else {
+    results = COURSES.filter(c => matches(c, q.toLowerCase())).sort((a,b) => score(b, q.toLowerCase()) - score(a, q.toLowerCase()));
+  }
+  if (dept) results = results.filter(c => c.dept === dept);
+  renderResults(results, q);
+}
+
+document.getElementById("search-form").addEventListener("submit", e => {
+  e.preventDefault();
+  handleSearch(document.getElementById("query").value, document.getElementById("dept").value);
+});
+document.querySelectorAll(".chip").forEach(ch => ch.addEventListener("click", () => {
+  document.getElementById("query").value = ch.textContent;
+  handleSearch(ch.textContent, document.getElementById("dept").value);
+}));
+
+renderResults([], "");
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UW Course Research Agent</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>UW Course Research Agent</h1>
+    <p class="subtitle">Read-only UW Seattle course search over approved indexed/snapshot sources.</p>
+  </header>
+
+  <main>
+    <section class="search-box">
+      <input id="query" type="text" placeholder="e.g. CSE 142, INFO courses, introductory programming" autofocus />
+      <button id="search-btn">Search</button>
+    </section>
+
+    <section id="limitations" class="limitation-banner" hidden></section>
+
+    <section id="results" class="results">
+      <h2>Results</h2>
+      <div id="results-list"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Sources are indexed snapshots, not live UW systems. Freshness metadata is shown per result.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

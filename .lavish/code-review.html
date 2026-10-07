@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Code Review — UW Course Research Agent</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --card: #ffffff;
+    --purple: #4b2e83;
+    --purple-dark: #3a2366;
+    --purple-soft: #eee9f6;
+    --gold: #b7a57a;
+    --gold-soft: #f0ead9;
+    --ink: #2b2b2b;
+    --muted: #6b6b6b;
+    --border: #ded8cf;
+    --code-bg: #2d2438;
+    --code-fg: #e8e3f0;
+    --ok: #2e7d32;
+    --warn: #b26a00;
+    --err: #b3261e;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 72px; }
+  header.hero {
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple));
+    color: #fff;
+    padding: 40px 24px 34px;
+  }
+  .hero-inner { max-width: 1080px; margin: 0 auto; }
+  .kicker {
+    font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold); font-weight: 700;
+  }
+  .hero h1 { font-size: 1.9rem; margin: 8px 0 12px; line-height: 1.2; }
+  .hero .lede { max-width: 760px; font-size: 1.05rem; opacity: 0.95; }
+  .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+  .stat {
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 10px; padding: 10px 16px; min-width: 120px;
+  }
+  .stat .n { font-size: 1.4rem; font-weight: 800; }
+  .stat .l { font-size: 0.78rem; opacity: 0.85; }
+  h2 { color: var(--purple); font-size: 1.3rem; margin: 44px 0 6px; }
+  h3 { color: var(--purple-dark); font-size: 1.05rem; margin: 0 0 6px; }
+  .section-note { color: var(--muted); font-size: 0.92rem; margin: 0 0 18px; max-width: 760px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 22px; margin: 0 0 18px;
+  }
+  .card.answer { border-left: 5px solid var(--purple); }
+  .answer p { margin: 0 0 8px; }
+  .badge {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 2px 9px; border-radius: 999px; margin-right: 6px;
+  }
+  .badge.fixed { background: #e6f4e6; color: var(--ok); border: 1px solid #bcdcbc; }
+  .badge.note { background: var(--gold-soft); color: #6b5a1e; border: 1px solid #d8cba0; }
+  .badge.risk { background: #fdecea; color: var(--err); border: 1px solid #f2c0bc; }
+  .tagrow { margin: 4px 0 10px; }
+  .fix-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .fix-head .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; color: var(--muted); }
+  .reason { color: var(--muted); font-size: 0.92rem; margin: 6px 0 14px; }
+  .diffbox {
+    background: var(--code-bg); border-radius: 10px; overflow: hidden; border: 1px solid #241c31;
+  }
+  .diffbox .lbl {
+    padding: 8px 14px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--code-fg); background: #241c31; border-bottom: 1px solid #3a2f4a;
+  }
+  .diffbox > div { padding: 8px 10px; }
+  figure { margin: 18px 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 0.82rem; color: var(--muted); margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--purple-dark); font-weight: 700; background: var(--purple-soft); }
+  tr:last-child td { border-bottom: none; }
+  td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; }
+  .check { color: var(--ok); font-weight: 700; }
+  ul.clean { margin: 8px 0 0; padding-left: 20px; }
+  ul.clean li { margin-bottom: 6px; }
+  code.inline { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; background: var(--purple-soft); padding: 1px 5px; border-radius: 4px; }
+  .leftout { border-left: 5px solid var(--gold); }
+  .leftout li { margin-bottom: 8px; }
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 1.5rem; }
+    .fix-head { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="kicker">Code Review · UW Course Research Agent</div>
+    <h1>LangGraph implementation is complete and grounded, with the review flags resolved</h1>
+    <p class="lede">
+      This is a read-only UW Seattle course research MVP (Python + LangGraph + FastAPI + SQLite/FTS5).
+      All 54 planned tasks are implemented; the 7 issues found during review were fixed and the full
+      test and golden-validation suites pass.
+    </p>
+    <div class="stats">
+      <div class="stat"><div class="n">39</div><div class="l">pytest tests passing</div></div>
+      <div class="stat"><div class="n">8/8</div><div class="l">golden cases passing</div></div>
+      <div class="stat"><div class="n">54</div><div class="l">tasks implemented</div></div>
+      <div class="stat"><div class="n">7</div><div class="l">review findings addressed</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <h2>The question this review answers</h2>
+  <div class="card answer">
+    <p><strong>Is the implementation correct against the spec, and are the review findings resolved?</strong></p>
+    <p>
+      Yes. The agent stays source-grounded (LLM may only restate cited facts), retrieval is deterministic over
+      approved snapshot data, and the grounding invariant is enforced by a deterministic verifier node. The flagged
+      issues — dead code, a fragile FastAPI signature, a checkpointer connection leak, private cross-module usage, a
+      misleading test name, an over-narrow classifier, and noisy FTS tokenization — are all fixed.
+    </p>
+    <div class="tagrow">
+      <span class="badge fixed">7 fixed</span>
+      <span class="badge note">2 design notes</span>
+    </div>
+  </div>
+
+  <h2>How the system fits together</h2>
+  <p class="section-note">
+    Two lanes share one SQLite + FTS5 store. The runtime lane is the LangGraph agent; the ingestion lane is a manual
+    Typer command that snapshots approved sources into the same store.
+  </p>
+
+  <figure>
+    <svg viewBox="0 0 960 430" role="img" aria-labelledby="arch-title arch-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="arch-title">Course Research Agent architecture</title>
+      <desc id="arch-desc">Runtime LangGraph flow on top, manual ingestion pipeline on the bottom, sharing a SQLite/FTS5 store.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 z" fill="#8a7fb0" />
+        </marker>
+      </defs>
+
+      <!-- Lane labels -->
+      <text x="16" y="30" font-size="13" font-weight="700" fill="#4b2e83">RUNTIME — LangGraph agent</text>
+      <text x="16" y="300" font-size="13" font-weight="700" fill="#b7a57a">INGESTION — manual snapshot pipeline</text>
+
+      <!-- Runtime lane nodes -->
+      <g>
+        <rect id="node-webui" x="16" y="48" width="130" height="46" rx="8" fill="#eee9f6" stroke="#4b2e83" stroke-width="1.5"/>
+        <text x="81" y="67" text-anchor="middle" font-size="12" fill="#2b2b2b">Web UI / API</text>
+        <text x="81" y="82" text-anchor="middle" font-size="10" fill="#6b6b6b">FastAPI</text>
+
+        <rect id="node-qu" x="180" y="48" width="150" height="46" rx="8" fill="#eee9f6" stroke="#4b2e83" stroke-width="1.5"/>
+        <text x="255" y="67" text-anchor="middle" font-size="12" fill="#2b2b2b">Query Understanding</text>
+        <text x="255" y="82" text-anchor="middle" font-size="10" fill="#6b6b6b">quick LLM → QueryIntent</text>
+
+        <rect id="node-router" x="364" y="48" width="150" height="46" rx="8" fill="#eee9f6" stroke="#4b2e83" stroke-width="1.5"/>
+        <text x="439" y="67" text-anchor="middle" font-size="12" fill="#2b2b2b">ConditionalLogic</text>
+        <text x="439" y="82" text-anchor="middle" font-size="10" fill="#6b6b6b">route(intent)</text>
+
+        <rect id="node-retr" x="548" y="48" width="180" height="46" rx="8" fill="#eee9f6" stroke="#4b2e83" stroke-width="1.5"/>
+        <text x="638" y="67" text-anchor="middle" font-size="12" fill="#2b2b2b">Retrievers</text>
+        <text x="638" y="82" text-anchor="middle" font-size="10" fill="#6b6b6b">exact · dept · keyword · NL</text>
+
+        <rect id="node-answer" x="762" y="48" width="150" height="46" rx="8" fill="#eee9f6" stroke="#4b2e83" stroke-width="1.5"/>
+        <text x="837" y="67" text-anchor="middle" font-size="12" fill="#2b2b2b">Answer Composer</text>
+        <text x="837" y="82" text-anchor="middle" font-size="10" fill="#6b6b6b">deep LLM, grounded</text>
+
+        <rect id="node-ground" x="16" y="130" width="170" height="46" rx="8" fill="#f0ead9" stroke="#b7a57a" stroke-width="1.5"/>
+        <text x="101" y="149" text-anchor="middle" font-size="12" fill="#2b2b2b">Grounding Verifier</text>
+        <text x="101" y="164" text-anchor="middle" font-size="10" fill="#6b6b6b">reject uncited claims</text>
+
+        <rect id="node-end" x="220" y="130" width="70" height="46" rx="8" fill="#e6f4e6" stroke="#2e7d32" stroke-width="1.5"/>
+        <text x="255" y="157" text-anchor="middle" font-size="13" font-weight="700" fill="#2e7d32">END</text>
+
+        <rect id="node-check" x="548" y="130" width="220" height="46" rx="8" fill="#fff" stroke="#8a7fb0" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="658" y="149" text-anchor="middle" font-size="12" fill="#2b2b2b">SqliteSaver checkpointer</text>
+        <text x="658" y="164" text-anchor="middle" font-size="10" fill="#6b6b6b">per workflow_id, resumable</text>
+
+        <!-- runtime edges -->
+        <line x1="146" y1="71" x2="180" y2="71" stroke="#8a7fb0" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="330" y1="71" x2="364" y2="71" stroke="#8a7fb0" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="514" y1="71" x2="548" y2="71" stroke="#8a7fb0" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="728" y1="71" x2="762" y2="71" stroke="#8a7fb0" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="837" y1="94" x2="837" y2="122" stroke="#8a7fb0" stroke-width="1.5"/>
+        <line x1="837" y1="122" x2="186" y2="122" stroke="#8a7fb0" stroke-width="1.5"/>
+        <line x1="186" y1="122" x2="186" y2="130" stroke="#8a7fb0" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="186" y1="153" x2="220" y2="153" stroke="#8a7fb0" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="638" y1="130" x2="638" y2="94" stroke="#8a7fb0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+
+        <!-- clarifier/out-of-scope side nodes -->
+        <rect id="node-clar" x="548" y="196" width="180" height="42" rx="8" fill="#fdecea" stroke="#b3261e" stroke-width="1.5"/>
+        <text x="638" y="213" text-anchor="middle" font-size="11" fill="#2b2b2b">Clarifier</text>
+        <text x="638" y="228" text-anchor="middle" font-size="9" fill="#6b6b6b">ambiguous follow-up</text>
+        <rect id="node-oos" x="762" y="196" width="150" height="42" rx="8" fill="#fdecea" stroke="#b3261e" stroke-width="1.5"/>
+        <text x="837" y="213" text-anchor="middle" font-size="11" fill="#2b2b2b">OutOfScope</text>
+        <text x="837" y="228" text-anchor="middle" font-size="9" fill="#6b6b6b">limitation only</text>
+        <line x1="439" y1="94" x2="638" y2="196" stroke="#c9a1a1" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+        <line x1="439" y1="94" x2="837" y2="196" stroke="#c9a1a1" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+      </g>
+
+      <!-- Store (shared) -->
+      <rect id="node-store" x="360" y="266" width="240" height="54" rx="8" fill="#4b2e83"/>
+      <text x="480" y="289" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">SQLite + FTS5</text>
+      <text x="480" y="305" text-anchor="middle" font-size="10" fill="#ddd3f0">courses · search docs · citations · conflicts</text>
+
+      <!-- Ingestion lane nodes -->
+      <g>
+        <rect id="node-src" x="16" y="318" width="150" height="46" rx="8" fill="#f0ead9" stroke="#b7a57a" stroke-width="1.5"/>
+        <text x="91" y="337" text-anchor="middle" font-size="12" fill="#2b2b2b">config/sources.yml</text>
+        <text x="91" y="352" text-anchor="middle" font-size="10" fill="#6b6b6b">allowlist registry</text>
+
+        <rect id="node-fetch" x="200" y="318" width="130" height="46" rx="8" fill="#f0ead9" stroke="#b7a57a" stroke-width="1.5"/>
+        <text x="265" y="337" text-anchor="middle" font-size="12" fill="#2b2b2b">Fetcher</text>
+        <text x="265" y="352" text-anchor="middle" font-size="10" fill="#6b6b6b">httpx + allowlist</text>
+
+        <rect id="node-snap" x="364" y="318" width="130" height="46" rx="8" fill="#f0ead9" stroke="#b7a57a" stroke-width="1.5"/>
+        <text x="429" y="337" text-anchor="middle" font-size="12" fill="#2b2b2b">Snapshot Store</text>
+        <text x="429" y="352" text-anchor="middle" font-size="10" fill="#6b6b6b">raw HTML</text>
+
+        <rect id="node-parse" x="528" y="318" width="160" height="46" rx="8" fill="#f0ead9" stroke="#b7a57a" stroke-width="1.5"/>
+        <text x="608" y="337" text-anchor="middle" font-size="12" fill="#2b2b2b">Parse · Normalize · Index</text>
+        <text x="608" y="352" text-anchor="middle" font-size="10" fill="#6b6b6b">catalog / dept pages</text>
+
+        <line x1="166" y1="341" x2="200" y2="341" stroke="#b7a57a" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="330" y1="341" x2="364" y2="341" stroke="#b7a57a" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="494" y1="341" x2="528" y2="341" stroke="#b7a57a" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="608" y1="364" x2="560" y2="364" stroke="#b7a57a" stroke-width="1.5"/>
+        <line x1="560" y1="364" x2="500" y2="320" stroke="#b7a57a" stroke-width="1.5" marker-end="url(#arrow)"/>
+      </g>
+
+      <!-- runtime reads store -->
+      <line x1="560" y1="266" x2="600" y2="266" stroke="#8a7fb0" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <line x1="600" y1="266" x2="600" y2="94" stroke="#8a7fb0" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+      <text x="606" y="185" font-size="10" fill="#6b6b6b">deterministic reads</text>
+    </svg>
+    <figcaption>Runtime graph (top) and manual ingestion pipeline (bottom) share the SQLite + FTS5 store. No open-web tool exists in the runtime graph.</figcaption>
+  </figure>
+
+  <h2>Review findings — before / after</h2>
+  <p class="section-note">
+    Each fix below is rendered as a split diff. Dark code panels use the <code class="inline">github-dark</code> theme for
+    readability on the light page.
+  </p>
+
+  <!-- Fix 1: dead code -->
+  <div class="card">
+    <div class="fix-head">
+      <h3>1. Dead code removed from graph assembly</h3>
+      <span class="path">courseagent/graph/setup.py</span>
+    </div>
+    <div class="tagrow"><span class="badge fixed">fixed</span><span class="badge note">cleanup</span></div>
+    <p class="reason">The <code class="inline">_bind()</code> helper was defined but never used. Removed.</p>
+    <div class="diffbox">
+      <div class="lbl">courseagent/graph/setup.py</div>
+      <div id="diff-setup"></div>
+    </div>
+  </div>
+
+  <!-- Fix 2: admin signature -->
+  <div class="card">
+    <div class="fix-head">
+      <h3>2. Fragile FastAPI route signature corrected</h3>
+      <span class="path">courseagent/api/routes/admin.py</span>
+    </div>
+    <div class="tagrow"><span class="badge fixed">fixed</span><span class="badge risk">was fragile</span></div>
+    <p class="reason">
+      <code class="inline">request: Request = None</code> is nonstandard (Request must not carry a <code class="inline">None</code>
+      default). Reordered so <code class="inline">request</code> is the required first parameter and the body model is optional.
+    </p>
+    <div class="diffbox">
+      <div class="lbl">courseagent/api/routes/admin.py</div>
+      <div id="diff-admin"></div>
+    </div>
+  </div>
+
+  <!-- Fix 3: checkpointer leak -->
+  <div class="card">
+    <div class="fix-head">
+      <h3>3. Checkpointer connection leak closed</h3>
+      <span class="path">courseagent/graph/course_graph.py</span>
+    </div>
+    <div class="tagrow"><span class="badge fixed">fixed</span><span class="badge risk">was leaking</span></div>
+    <p class="reason">
+      <code class="inline">compile()</code> created a new <code class="inline">CheckpointerManager</code> (open SQLite connection)
+      on every <code class="inline">run()</code> and never closed the previous one. The compiled app is now cached and reused,
+      with an explicit <code class="inline">close()</code>.
+    </p>
+    <div class="diffbox">
+      <div class="lbl">courseagent/graph/course_graph.py</div>
+      <div id="diff-graph"></div>
+    </div>
+  </div>
+
+  <!-- Fix 4: private cross-module usage + stopwords -->
+  <div class="card">
+    <div class="fix-head">
+      <h3>4. Private helper made public + FTS stopword filtering</h3>
+      <span class="path">courseagent/dataflows/retrieval.py</span>
+    </div>
+    <div class="tagrow"><span class="badge fixed">fixed</span><span class="badge note">API hygiene</span></div>
+    <p class="reason">
+      <code class="inline">_fetch_citations</code> was used across layers despite its private underscore; renamed to
+      <code class="inline">fetch_citations</code> and call sites updated. Natural-language search now drops English stopwords
+      before building the FTS5 OR query.
+    </p>
+    <div class="diffbox">
+      <div class="lbl">courseagent/dataflows/retrieval.py</div>
+      <div id="diff-retrieval"></div>
+    </div>
+  </div>
+
+  <!-- Fix 5: heuristic -->
+  <div class="card">
+    <div class="fix-head">
+      <h3>5. Deterministic classifier broadened</h3>
+      <span class="path">courseagent/agents/query_understanding.py</span>
+    </div>
+    <div class="tagrow"><span class="badge fixed">fixed</span><span class="badge note">accuracy</span></div>
+    <p class="reason">
+      The fallback matched only <code class="inline">CSE|INFO</code> and a strict 3-digit code, so section suffixes
+      (<code class="inline">CSE 142 A</code>) and other department codes fell through. Now supports section suffixes,
+      a department-suffix pattern, and a wider known-department set.
+    </p>
+    <div class="diffbox">
+      <div class="lbl">courseagent/agents/query_understanding.py</div>
+      <div id="diff-qu"></div>
+    </div>
+  </div>
+
+  <!-- Fix 6: trivial call-site + test changes -->
+  <h2>Remaining changes (small)</h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>File</th><th>Change</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">courseagent/agents/retrievers.py</td>
+          <td>2 call sites <code class="inline">_fetch_citations → fetch_citations</code></td>
+          <td>Public rename follow-up</td>
+        </tr>
+        <tr>
+          <td class="mono">courseagent/api/routes/courses.py</td>
+          <td>1 call site <code class="inline">_fetch_citations → fetch_citations</code></td>
+          <td>Public rename follow-up</td>
+        </tr>
+        <tr>
+          <td class="mono">tests/test_query_understanding.py</td>
+          <td>Renamed misleading test; added section-suffix and bare-department tests</td>
+          <td>Fix #6 (naming) + cover new heuristic paths</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Test inventory</h2>
+  <p class="section-note">39 pytest tests across 8 files, plus an 8-case golden validation suite.</p>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>File</th><th>Tests</th><th>Covers</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="mono">test_source_registry.py</td><td class="check">5</td><td>Allowlist exact/wildcard/reject, YAML load, unknown source</td></tr>
+        <tr><td class="mono">test_catalog_parser.py</td><td class="check">3</td><td>Course-code extraction, description provenance, empty HTML</td></tr>
+        <tr><td class="mono">test_query_understanding.py</td><td class="check">9</td><td>Intent classification + router mapping + section suffix</td></tr>
+        <tr><td class="mono">test_retrievers.py</td><td class="check">6</td><td>Exact/department/keyword/natural-language retrieval</td></tr>
+        <tr><td class="mono">test_grounding.py</td><td class="check">6</td><td>Uncited-claim flags, conflict detection, quarter guard</td></tr>
+        <tr><td class="mono">test_privacy.py</td><td class="check">4</td><td>Student ID / email / NetID redaction</td></tr>
+        <tr><td class="mono">test_course_graph_us1.py</td><td class="check">3</td><td>Full-graph exact lookup, missing course, checkpoint persistence</td></tr>
+        <tr><td class="mono">test_api_search.py</td><td class="check">3</td><td><code class="inline">/course-search</code> citations+freshness, no-results, detail</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:14px;font-size:0.9rem;color:var(--muted)">
+      Golden validation: <strong>8/8</strong> cases pass via <code class="inline">validation/run_validation.py</code>
+      (exact lookup, department, keyword, natural-language, missing-field, live-only out-of-scope, workflow-state).
+    </p>
+  </div>
+
+  <h2>Deliberately left out of this pass</h2>
+  <div class="card leftout">
+    <ul class="clean">
+      <li><strong>Real ingestion</strong> — <code class="inline">courseagent ingest</code> has not been run against live UW URLs; tests use fixture HTML. Requires network.</li>
+      <li><strong>Live LLM path</strong> — the DeepSeek-backed classification/synthesis route is implemented but unverified without <code class="inline">DEEPSEEK_API_KEY</code>; the deterministic fallback is what the tests exercise.</li>
+      <li><strong>FTS ranking tuning</strong> — BM25 thresholds are data-dependent and left for the first real-data pass; only stopword filtering is applied now.</li>
+      <li><strong>Commit / push</strong> — all changes are currently uncommitted in the working tree.</li>
+    </ul>
+  </div>
+
+  <p class="section-note" style="margin-top:32px">
+    Design system: this artifact matches the subject project's own UI tokens (UW purple <code class="inline">#4b2e83</code>
+    and gold <code class="inline">#b7a57a</code>, light <code class="inline">#f7f6f3</code> background) from
+    <code class="inline">courseagent/web/styles.css</code>, rather than a generic component library.
+  </p>
+
+</div>
+
+<script type="module">
+  import { File, FileDiff } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+
+  const theme = { light: "github-light", dark: "github-dark" };
+  const options = { theme, themeType: "dark", overflow: "wrap" };
+
+  function renderDiff(id, name, oldContents, newContents) {
+    new FileDiff({ ...options, diffStyle: "split" }).render({
+      containerWrapper: document.querySelector(id),
+      oldFile: { name, contents: oldContents },
+      newFile: { name, contents: newContents },
+    });
+  }
+
+  renderDiff("#diff-setup", "setup.py",
+`    def query_understanding_node(state: dict[str, Any]) -> dict[str, Any]:
+        intent = query_understanding.classify_query(state.get("query", ""), quick_llm)
+        return {"intent": intent, "interpreted_filters": {}}
+
+    def _bind(conn_: sqlite3.Connection) -> Callable[[dict[str, Any]], dict[str, Any]]:
+        def wrapped(state: dict[str, Any]) -> dict[str, Any]:
+            return state
+
+        return wrapped
+
+    # Retrieval nodes receive the shared DB connection and LLMs via closure.`,
+`    def query_understanding_node(state: dict[str, Any]) -> dict[str, Any]:
+        intent = query_understanding.classify_query(state.get("query", ""), quick_llm)
+        return {"intent": intent, "interpreted_filters": {}}
+
+    # Retrieval nodes receive the shared DB connection and LLMs via closure.`
+  );
+
+  renderDiff("#diff-admin", "admin.py",
+`@router.post("/admin/snapshots/import", response_model=SnapshotImportResponse)
+def import_snapshot(payload: ImportRequest | None = None, request: Request = None) -> SnapshotImportResponse:`,
+`@router.post("/admin/snapshots/import", response_model=SnapshotImportResponse)
+def import_snapshot(request: Request, payload: ImportRequest | None = None) -> SnapshotImportResponse:`
+  );
+
+  renderDiff("#diff-graph", "course_graph.py",
+`        self.config = config or DefaultConfig()
+        self.conn = conn
+        self.quick_llm = quick_llm
+        self.deep_llm = deep_llm
+        self._checkpoint_manager: CheckpointerManager | None = None
+
+    def _ensure_conn(self) -> sqlite3.Connection:
+        if self.conn is None:
+            from courseagent.dataflows.db import init_db
+
+            self.conn = init_db(self.config.db_path)
+        return self.conn
+
+    def compile(self) -> Any:
+        conn = self._ensure_conn()
+        graph = setup_graph(conn, quick_llm=self.quick_llm, deep_llm=self.deep_llm)
+        self._checkpoint_manager = CheckpointerManager(self.config.data_dir)
+        return graph.compile(checkpointer=self._checkpoint_manager.saver)`,
+`        self.config = config or DefaultConfig()
+        self.conn = conn
+        self.quick_llm = quick_llm
+        self.deep_llm = deep_llm
+        self._checkpoint_manager: CheckpointerManager | None = None
+        self._app: Any | None = None
+
+    def _ensure_conn(self) -> sqlite3.Connection:
+        if self.conn is None:
+            from courseagent.dataflows.db import init_db
+
+            self.conn = init_db(self.config.db_path)
+        return self.conn
+
+    def compile(self) -> Any:
+        """Compile (or return the cached) graph with a persistent checkpointer.
+
+        The compiled app and its CheckpointerManager are reused across run()
+        calls to avoid leaking a SQLite connection per invocation.
+        """
+        if self._app is not None:
+            return self._app
+        conn = self._ensure_conn()
+        graph = setup_graph(conn, quick_llm=self.quick_llm, deep_llm=self.deep_llm)
+        self._checkpoint_manager = CheckpointerManager(self.config.data_dir)
+        self._app = graph.compile(checkpointer=self._checkpoint_manager.saver)
+        return self._app
+
+    def close(self) -> None:
+        """Release the checkpointer connection and reset the compiled app."""
+        if self._checkpoint_manager is not None:
+            self._checkpoint_manager.close()
+            self._checkpoint_manager = None
+        self._app = None`
+  );
+
+  renderDiff("#diff-retrieval", "retrieval.py",
+`def _fetch_citations(conn: sqlite3.Connection, course_id: str) -> list[dict[str, Any]]:
+    cursor = conn.execute("SELECT * FROM citations WHERE course_id = ? ORDER BY claim_field", (course_id,))
+    return [dict(row) for row in cursor.fetchall()]
+
+# ...in search_natural_language:
+    import re
+
+    tokens = re.findall(r"[A-Za-z0-9]{2,}", query.lower())
+    if not tokens:
+        return []
+    fts_query = " OR ".join(tokens)`,
+`def fetch_citations(conn: sqlite3.Connection, course_id: str) -> list[dict[str, Any]]:
+    cursor = conn.execute("SELECT * FROM citations WHERE course_id = ? ORDER BY claim_field", (course_id,))
+    return [dict(row) for row in cursor.fetchall()]
+
+# ...in search_natural_language:
+    import re
+
+    stopwords = {
+        "a", "an", "the", "and", "or", "of", "in", "on", "for", "with",
+        "is", "are", "was", "were", "to", "about", "course", "courses",
+        "class", "classes", "what", "which", "how", "intro", "introductory",
+    }
+    tokens = [t for t in re.findall(r"[A-Za-z0-9]{2,}", query.lower()) if t not in stopwords]
+    if not tokens:
+        return []
+    fts_query = " OR ".join(tokens)`
+  );
+
+  renderDiff("#diff-qu", "query_understanding.py",
+`_COURSE_CODE_RE = re.compile(r"^\\s*([A-Za-z&]{2,6})\\s+(\\d{3})\\s*$")
+
+
+def _heuristic_intent(query: str) -> QueryIntent:
+    stripped = query.strip()
+    upper = stripped.upper()
+    code_match = _COURSE_CODE_RE.match(stripped)
+    if code_match:
+        dept = code_match.group(1).upper()
+        number = code_match.group(2)
+        return QueryIntent(
+            intent=QueryIntentType.exact_code,
+            department_code=dept,
+            course_number=number,
+            course_id=f"{dept}-{number}",
+            confidence=0.95,
+            rationale="Deterministic course-code pattern match",
+        )
+    # Known department token (e.g. "CSE courses")
+    dept_tokens = re.findall(r"\\b(CSE|INFO)\\b", upper)
+    if len(dept_tokens) == 1 and len(stripped.split()) <= 3:
+        return QueryIntent(
+            intent=QueryIntentType.department,
+            department_code=dept_tokens[0],
+            confidence=0.7,
+            rationale="Single department token with short query",
+        )
+    if len(stripped.split()) == 1:
+        return QueryIntent(
+            intent=QueryIntentType.keyword,
+            keyword=stripped,
+            confidence=0.6,
+            rationale="Single keyword token",
+        )
+    return QueryIntent(
+        intent=QueryIntentType.natural_language,
+        natural_language_query=stripped,
+        confidence=0.5,
+        rationale="Default natural-language interpretation",
+    )`,
+`_COURSE_CODE_RE = re.compile(r"^\\s*([A-Za-z&]{2,6})\\s+(\\d{3})(?:\\s+[A-Za-z])?\\s*$")
+_DEPT_SUFFIX_RE = re.compile(r"^\\s*([A-Za-z&]{2,6})\\s+(?:courses?|classes?|dept|department)\\s*$", re.IGNORECASE)
+_KNOWN_DEPTS = {"CSE", "INFO", "MATH", "PHYS", "CHEM", "BIOL", "ENGL", "ECON", "PSYCH", "STAT"}
+
+
+def _heuristic_intent(query: str) -> QueryIntent:
+    stripped = query.strip()
+    upper = stripped.upper()
+
+    code_match = _COURSE_CODE_RE.match(stripped)
+    if code_match:
+        dept = code_match.group(1).upper()
+        number = code_match.group(2)
+        return QueryIntent(
+            intent=QueryIntentType.exact_code,
+            department_code=dept,
+            course_number=number,
+            course_id=f"{dept}-{number}",
+            confidence=0.95,
+            rationale="Deterministic course-code pattern match",
+        )
+
+    dept_match = _DEPT_SUFFIX_RE.match(stripped)
+    if dept_match:
+        return QueryIntent(
+            intent=QueryIntentType.department,
+            department_code=dept_match.group(1).upper(),
+            confidence=0.9,
+            rationale="Department token followed by a course/class suffix",
+        )
+
+    if upper in _KNOWN_DEPTS:
+        return QueryIntent(
+            intent=QueryIntentType.department,
+            department_code=upper,
+            confidence=0.85,
+            rationale="Bare known department code",
+        )
+
+    if len(stripped.split()) == 1:
+        return QueryIntent(
+            intent=QueryIntentType.keyword,
+            keyword=stripped,
+            confidence=0.6,
+            rationale="Single keyword token",
+        )
+    return QueryIntent(
+        intent=QueryIntentType.natural_language,
+        natural_language_query=stripped,
+        confidence=0.5,
+        rationale="Default natural-language interpretation",
+    )`
+  );
+</script>
+
+</body>
+</html>

@@ -1,0 +1,68 @@
+{
+  "cases": [
+    {
+      "id": "exact-lookup-cse-142",
+      "query": "CSE 142",
+      "expect": {
+        "status": "ok",
+        "answer_contains": ["CSE 142", "Computer Programming"],
+        "has_citation": true,
+        "has_freshness": true
+      }
+    },
+    {
+      "id": "exact-lookup-info-200",
+      "query": "INFO 200",
+      "expect": {
+        "status": "ok",
+        "has_citation": true
+      }
+    },
+    {
+      "id": "department-search-cse",
+      "query": "CSE courses",
+      "expect": {
+        "status": "ok",
+        "has_results": true
+      }
+    },
+    {
+      "id": "keyword-search",
+      "query": "programming",
+      "expect": {
+        "status": "ok"
+      }
+    },
+    {
+      "id": "natural-language-search",
+      "query": "introductory programming course",
+      "expect": {
+        "status": "ok"
+      }
+    },
+    {
+      "id": "missing-field",
+      "query": "CSE 999",
+      "expect": {
+        "status": "not_found",
+        "has_limitation": true
+      }
+    },
+    {
+      "id": "live-only-out-of-scope",
+      "query": "how many open seats are in CSE 142",
+      "expect": {
+        "never_authoritative": true
+      }
+    },
+    {
+      "id": "workflow-state",
+      "query": "CSE 142",
+      "workflow_id": "golden-wf-1",
+      "expect": {
+        "status": "ok",
+        "workflow_id": "golden-wf-1"
+      }
+    }
+  ]
+}
