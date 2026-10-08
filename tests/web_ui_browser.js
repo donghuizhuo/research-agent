@@ -9,6 +9,16 @@ async function query(value, department = '') {
   await page.wait(700);
 }
 await check('detail initially hidden', () => document.querySelector('.detail-panel').hidden);
+const screenshotQuery = 'show me information about the cse 143';
+await query(screenshotQuery);
+await check('screenshot query returns only CSE 143 and opens cited detail', () =>
+  document.querySelector('#result-count').textContent === '1 result' &&
+  document.querySelector('#answer-type').textContent === 'Direct match' &&
+  document.querySelectorAll('.result-card').length === 1 &&
+  document.querySelector('.result-card').innerText.includes('CSE 143') &&
+  document.querySelector('#detail-heading').textContent === 'CSE 143' &&
+  !document.querySelector('.detail-panel').hidden &&
+  document.querySelector('#course-sources a')?.href.startsWith('https://www.washington.edu/'));
 await query('');
 await check('empty input guidance', () => document.querySelector('#status-region').innerText.includes('Enter a course'));
 // Delay the real API, rather than replacing its success response.
@@ -55,6 +65,11 @@ await check('keyboard suggestion auto-opens exact detail', () => document.queryS
 await page.eval(() => {document.querySelector('#query-input').value='CSE 143';document.querySelector('#query-input').focus();});
 await page.press('Enter');await page.wait(900);
 await check('Enter submits and preserves workflow', () => document.querySelector('#detail-heading').textContent === 'CSE 143');
+await query(screenshotQuery);
+await check('screenshot query in reused workflow stays exact', () =>
+  document.querySelector('#result-count').textContent === '1 result' &&
+  document.querySelector('#detail-heading').textContent === 'CSE 143' &&
+  !document.querySelector('.detail-panel').hidden);
 // HTTP errors must not be mistaken for successful empty results.
 await page.eval(() => {window.fetch=async()=>new Response('{}',{status:500});});
 await query('programming');
