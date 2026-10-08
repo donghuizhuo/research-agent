@@ -33,7 +33,7 @@ def create_tier_client(config: DefaultConfig, tier: Tier, **overrides: Any) -> C
     kwargs: dict[str, Any] = {
         "model": model,
         "temperature": 0 if tier == "deep" else 0.1,
-        "timeout": config.llm_timeout_seconds,
+        "timeout": 10.0,
         "max_retries": 0,
     }
     if base_url:

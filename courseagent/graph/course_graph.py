@@ -11,6 +11,7 @@ from typing import Any
 from langgraph.types import Overwrite
 
 from config.default_config import DefaultConfig
+from courseagent.agents.grounding import redact_sensitive_input
 from courseagent.agents.schemas import CourseAnswer
 from courseagent.graph.checkpointer import CheckpointerManager, thread_id_for
 from courseagent.graph.setup import setup_graph
@@ -66,6 +67,7 @@ class CourseResearchGraph:
     def run(self, query: str, workflow_id: str | None = None) -> dict[str, Any]:
         """Run the graph once for a query and return a serializable result."""
 
+        query = redact_sensitive_input(query)
         workflow_id = workflow_id or uuid.uuid4().hex
         app = self.compile()
         config = {"configurable": {"thread_id": thread_id_for(workflow_id)}}

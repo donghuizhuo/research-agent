@@ -48,8 +48,8 @@ Both entrypoints use the same quick/deep client construction. DeepSeek uses
 Missing credentials, unsupported runtime providers, or either tier failing to
 initialize leave the whole graph deterministic. Invocation errors, including
 timeouts, fall back within each node. Requests have no automatic retries and
-a 10-second timeout per HTTP transport phase (connect/read/write/pool), configurable
-through `DefaultConfig.llm_timeout_seconds` in `(0, 60]`. This is a transport bound,
+a fixed 10-second timeout per HTTP transport phase (connect/read/write/pool).
+This is a transport bound,
 not an overall workflow deadline.
 
 Typed course objects, metadata, and citations always come from retrieval, including
@@ -58,3 +58,10 @@ no-results searches skip synthesis. The API schema is unchanged and serializes
 catalog results. CLI/graph `answer` may contain generated prose; `structured_answer`
 remains the authoritative catalog answer. Model prose is not validated against
 catalog facts by this contract fix.
+
+API and CLI queries pass through the existing lexical redactor before graph state,
+checkpoint persistence, classification, or synthesis. It masks standalone seven-digit
+numbers, email addresses, and labeled NetID/student-ID tokens; it is not comprehensive
+sensitive-information detection. Offline regressions capture both tiers’ emitted
+prompts and persisted checkpoints for these patterns and check unchanged catalog
+results. They do not evaluate live model interpretation or other sensitive formats.

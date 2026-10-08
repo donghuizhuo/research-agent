@@ -88,7 +88,7 @@ def test_api_and_cli_share_opt_in_and_fallback(catalog, monkeypatch, case):
         assert kwargs["api_key"] == "synthetic-deepseek-key"
         assert kwargs["base_url"] == cfg.deepseek_base_url
         assert kwargs["model"] == cfg.deep_model
-        assert kwargs["timeout"] == cfg.llm_timeout_seconds
+        assert kwargs["timeout"] == 10.0
         assert kwargs["max_retries"] == 0
 
 
@@ -136,12 +136,6 @@ def test_serve_passes_mode_to_real_app_configuration(monkeypatch):
     assert run.call_args.kwargs == {"host": "127.0.0.1", "port": 8123}
 
 
-@pytest.mark.parametrize("seconds", [0, -1, 61, float("inf"), float("nan")])
-def test_invalid_transport_timeout_rejected(seconds):
-    with pytest.raises(ValueError):
-        DefaultConfig(llm_timeout_seconds=seconds)
-
-
 def test_factory_explicit_credential_overrides_environment(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "environment-key")
     constructor = Mock()
@@ -176,7 +170,7 @@ def test_real_client_timeout_has_no_retry_and_deterministic_fallback(monkeypatch
         raise httpx.ReadTimeout("synthetic transport timeout", request=request)
 
     with httpx.Client(transport=httpx.MockTransport(timeout)) as transport:
-        llm = factory.create_tier_client(DefaultConfig(llm_timeout_seconds=0.25), "deep", http_client=transport)
+        llm = factory.create_tier_client(DefaultConfig(), "deep", http_client=transport)
         from courseagent.agents.answer_composer import compose_answer
         from courseagent.agents.schemas import CourseSearchResult
 
@@ -188,5 +182,62 @@ def test_real_client_timeout_has_no_retry_and_deterministic_fallback(monkeypatch
         assert "Credits: 4" in actual["answer"]
     assert len(requests) == 1
     assert requests[0].extensions["timeout"] == {
-        "connect": 0.25, "read": 0.25, "write": 0.25, "pool": 0.25}
+        "connect": 10.0, "read": 10.0, "write": 10.0, "pool": 10.0}
     assert requests[0].headers["authorization"] == "Bearer synthetic-key"
+
+
+@pytest.mark.parametrize("private", [
+    "My student id is 1234567; explain CSE 142",
+    "email user@uw.edu; explain CSE 142",
+    "my netid: jsmith42; explain CSE 142",
+])
+def test_api_cli_redact_before_models_and_checkpoints(catalog, monkeypatch, private):
+    from courseagent.agents.grounding import redact_sensitive_input
+    from courseagent.graph.checkpointer import CheckpointerManager
+
+    prompts = {"quick": [], "deep": []}
+
+    class CapturingQuick(QuickModel):
+        def invoke(self, messages):
+            prompts["quick"].append(messages)
+            return super().invoke(messages)
+
+    class CapturingDeep(ControlledModel):
+        def invoke(self, messages):
+            prompts["deep"].append(messages)
+            return super().invoke(messages)
+
+    quick, deep = CapturingQuick(), CapturingDeep()
+    monkeypatch.setattr(factory, "create_tier_client",
+                        lambda config, tier: quick if tier == "quick" else deep)
+    registry, _ = main._load_registry()
+    cfg = replace(catalog, llm_mode="model")
+    monkeypatch.setattr(main, "_load_registry", lambda: (registry, cfg))
+    runner = CliRunner()
+    baseline = json.loads(runner.invoke(main.app, ["search", "CSE 142"]).output)
+    result = runner.invoke(main.app, ["search", private])
+    assert result.exit_code == 0, result.output
+    actual = json.loads(result.output)
+    assert actual["query"] == redact_sensitive_input(private)
+    for field in ("course", "ranked_courses", "citations", "freshness", "limitations", "status"):
+        assert actual["structured_answer"][field] == baseline["structured_answer"][field]
+    with TestClient(api_app.create_app(cfg)) as client:
+        expected = client.post("/course-search", json={"query": "CSE 142"}).json()
+        response = client.post("/course-search", json={"query": private})
+        assert response.status_code == 200
+        assert response.json()["results"] == expected["results"]
+        assert response.json()["answer_type"] == expected["answer_type"]
+    assert quick.calls == deep.calls == 4
+    manager = CheckpointerManager(catalog.data_dir)
+    try:
+        checkpoints = [entry.checkpoint for entry in manager.saver.list(None)]
+    finally:
+        manager.close()
+    assert checkpoints
+    assert any(entry["channel_values"].get("query") == redact_sensitive_input(private)
+               for entry in checkpoints)
+    for emitted in (prompts["quick"], prompts["deep"], checkpoints, actual):
+        serialized = json.dumps(emitted, default=str)
+        assert "[REDACTED]" in serialized
+        for secret in ("1234567", "user@uw.edu", "jsmith42"):
+            assert secret not in serialized
