@@ -8,9 +8,12 @@ from typing import Any
 from courseagent.agents.schemas import QueryIntent, QueryIntentType
 
 
-_COURSE_CODE_RE = re.compile(r"^\s*([A-Za-z&]{2,6})(?:\s*-\s*|\s*)(\d{3})(?:\s+[A-Za-z])?\s*$")
-_COURSE_REFERENCE_RE = re.compile(
-    r"(?<![\w&])([A-Za-z&]{2,6})(?:\s*-\s*|\s*)(\d{3})(?![\w&])"
+_COURSE_CODE_RE = re.compile(r"^\s*([A-Za-z&]{2,6})\s+(\d{3})(?:\s+[A-Za-z])?\s*$")
+_COURSE_INFORMATION_RE = re.compile(
+    r"(?:show\s+me(?:\s+information\s+about)?|tell\s+me\s+about|"
+    r"what\s+is|what\s+are\s+the\s+prerequisites\s+for)"
+    r"\s+(?:the\s+)?\(?([A-Za-z&]{2,6})\s+(\d{3})\)?[.!?]*",
+    re.IGNORECASE,
 )
 _DEPT_SUFFIX_RE = re.compile(r"^\s*([A-Za-z&]{2,6})\s+(?:courses?|classes?|dept|department)\s*$", re.IGNORECASE)
 _KNOWN_DEPTS = {"CSE", "INFO", "MATH", "PHYS", "CHEM", "BIOL", "ENGL", "ECON", "PSYCH", "STAT"}
@@ -22,27 +25,13 @@ def _heuristic_intent(query: str) -> QueryIntent:
     stripped = query.strip()
     upper = stripped.upper()
 
-    # Keep standalone codes (including section letters) supported. In prose,
-    # require a known department so phrases such as "about 143" aren't codes.
-    # Multiple distinct references retain the existing discovery/LLM path.
     code_match = _COURSE_CODE_RE.match(stripped)
-    references = {
-        (match.group(1).upper(), match.group(2))
-        for match in _COURSE_REFERENCE_RE.finditer(stripped)
-    }
-    reference = next(iter(references)) if len(references) == 1 else None
-    # A second bare number can be a shorthand reference ("CSE 142 or 143").
-    # Leave those requests on their existing path rather than choosing one.
-    other_numbers = set(re.findall(r"(?<!\w)\d{3}(?!\w)", stripped))
+    information_match = _COURSE_INFORMATION_RE.fullmatch(stripped)
     if code_match or (
-        reference is not None
-        and reference[0] in _KNOWN_DEPTS
-        and other_numbers <= {reference[1]}
+        information_match and information_match.group(1).upper() in _KNOWN_DEPTS
     ):
-        dept, number = (
-            (code_match.group(1).upper(), code_match.group(2))
-            if code_match else reference
-        )
+        match = code_match or information_match
+        dept, number = match.group(1).upper(), match.group(2)
         return QueryIntent(
             intent=QueryIntentType.exact_code,
             department_code=dept,
@@ -89,8 +78,8 @@ def _heuristic_intent(query: str) -> QueryIntent:
 def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
     """Classify a user query into a structured QueryIntent.
 
-    Unambiguous explicit course codes use deterministic lookup even with an LLM
-    client. Other queries use the client when provided, with heuristic fallback.
+    Standalone codes and explicit course-information requests use deterministic
+    lookup even with an LLM client. Other queries use the client when provided, with heuristic fallback.
     """
 
     heuristic = _heuristic_intent(query)

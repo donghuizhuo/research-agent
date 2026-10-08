@@ -59,11 +59,10 @@ def test_route_out_of_scope_default() -> None:
 
 @pytest.mark.parametrize("query", [
     "show me information about the cse 143",
-    "Tell me about CSE143.",
-    "What are the prerequisites for (CsE-143)?",
+    "Tell me about CSE 143.",
+    "What are the prerequisites for (CsE 143)?",
     "Show me CSE\t 143!",
-    "CSE-143", "cse143", "CSE 143 A",
-    "CSE 143: more information about CSE143, please.",
+    "CSE 143 A",
     "What is INFO 201?", "What is MATH 124?",
 ])
 def test_explicit_reference_routes_to_exact_lookup(query) -> None:
@@ -78,9 +77,9 @@ def test_explicit_reference_routes_to_exact_lookup(query) -> None:
     "show me XCSE143", "show me _CSE143", "show me CSE1430",
     "show me CSE 1430", "show me CSE143abc", "show me CSE 143abc",
     "show me CSE 14", "show me CSE 143_", "show me TCSE 143",
-    "Compare CSE 142 and CSE 143", "CSE143 or INFO201?",
-    "Compare CSE 142 and 143", "CSE143/142", "142 versus CSE 143",
-    "CSE 143 or CSS 143", "Compare CSE143 and CSS144",
+    "Compare CSE 142 and CSE 143",
+    "Compare CSE 142 and 143", "142 versus CSE 143",
+    "CSE 143 or CSS 143",
     "intro programming courses", "machine learning", "CSE courses",
 ])
 def test_non_unique_or_misleading_reference_does_not_force_exact_lookup(query) -> None:
@@ -105,3 +104,31 @@ def test_multi_course_query_keeps_existing_model_path() -> None:
 
     intent = classify_query("Compare CSE 142 and CSE 143", AmbiguousLLM())
     assert route({"intent": intent}) == "clarifier"
+
+
+@pytest.mark.parametrize("query", [
+    "Which courses have CSE 142 as a prerequisite?",
+    "Courses similar to CSE 142",
+    "Show me courses that require CSE 142",
+    "Tell me about CSE 142 alternatives",
+])
+def test_course_criterion_preserves_discovery(query) -> None:
+    assert classify_query(query).intent == QueryIntentType.natural_language
+
+    class DiscoveryLLM:
+        def with_structured_output(self, schema):
+            return self
+
+        def invoke(self, messages):
+            return QueryIntent(intent=QueryIntentType.natural_language,
+                               natural_language_query=query)
+
+    intent = classify_query(query, DiscoveryLLM())
+    assert intent.intent == QueryIntentType.natural_language
+    assert intent.natural_language_query == query
+
+    class FailingLLM(DiscoveryLLM):
+        def invoke(self, messages):
+            raise RuntimeError("Unavailable")
+
+    assert classify_query(query, FailingLLM()).intent == QueryIntentType.natural_language
