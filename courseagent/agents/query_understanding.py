@@ -1,4 +1,4 @@
-"""Query intent classification node (quick-tier LLM -> structured output)."""
+"""Query intent classification node; see classify_query for routing policy."""
 
 from __future__ import annotations
 
@@ -9,6 +9,10 @@ from courseagent.agents.schemas import QueryIntent, QueryIntentType
 
 
 _COURSE_CODE_RE = re.compile(r"^\s*([A-Za-z&]{2,6})\s+(\d{3})(?:\s+[A-Za-z])?\s*$")
+_COURSE_INFORMATION_RE = re.compile(
+    r"show\s+me\s+information\s+about\s+(?:the\s+)?([A-Za-z&]{2,6})\s+(\d{3})",
+    re.IGNORECASE,
+)
 _DEPT_SUFFIX_RE = re.compile(r"^\s*([A-Za-z&]{2,6})\s+(?:courses?|classes?|dept|department)\s*$", re.IGNORECASE)
 _KNOWN_DEPTS = {"CSE", "INFO", "MATH", "PHYS", "CHEM", "BIOL", "ENGL", "ECON", "PSYCH", "STAT"}
 
@@ -19,11 +23,13 @@ def _heuristic_intent(query: str) -> QueryIntent:
     stripped = query.strip()
     upper = stripped.upper()
 
-    # Exact course code, with optional section/suffix letter (e.g. "CSE 142 A").
     code_match = _COURSE_CODE_RE.match(stripped)
-    if code_match:
-        dept = code_match.group(1).upper()
-        number = code_match.group(2)
+    information_match = _COURSE_INFORMATION_RE.fullmatch(stripped)
+    if code_match or (
+        information_match and information_match.group(1).upper() in _KNOWN_DEPTS
+    ):
+        match = code_match or information_match
+        dept, number = match.group(1).upper(), match.group(2)
         return QueryIntent(
             intent=QueryIntentType.exact_code,
             department_code=dept,
@@ -70,12 +76,16 @@ def _heuristic_intent(query: str) -> QueryIntent:
 def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
     """Classify a user query into a structured QueryIntent.
 
-    When an LLM client is provided, it is used for classification; otherwise a
-    deterministic heuristic is applied so the graph works without a live model.
+    Standalone codes and full queries matching "show me information about
+    [the] <department> <number>" use deterministic lookup even with an LLM
+    client. The prose form requires a known department and whitespace between
+    the department and number; matching is case-insensitive. Other queries use
+    the client when provided, with heuristic fallback.
     """
 
-    if llm is None:
-        return _heuristic_intent(query)
+    heuristic = _heuristic_intent(query)
+    if heuristic.intent == QueryIntentType.exact_code or llm is None:
+        return heuristic
     structured_llm = llm.with_structured_output(QueryIntent)
     try:
         return structured_llm.invoke(

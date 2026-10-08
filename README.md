@@ -28,3 +28,8 @@ courseagent serve               # API + Web UI on http://127.0.0.1:8000
 ```
 
 See `specs/001-course-search/quickstart.md` for full details.
+
+For a direct course lookup, enter `CSE 143` or
+`show me information about the cse 143` in the CLI or Web UI. The latter also
+accepts omission of `the`. Course discovery queries such as
+`Which courses have CSE 142 as a prerequisite?` continue through discovery search.

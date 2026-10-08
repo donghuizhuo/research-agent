@@ -69,3 +69,44 @@ def test_approved_catalog_ingestion_search_and_detail(tmp_path, monkeypatch):
         assert detail["title"] == "Computer Programming II"
         assert any(c["evidence_text"] == "CSE 142." for c in detail["citations"])
         assert api.post("/course-search", json={"query": "CSE 999"}).json()["results"] == []
+
+        # The screenshot request must use exact lookup on the normally ingested
+        # catalog, with identical facts/provenance in fresh and reused sessions.
+        bare = api.post("/course-search", json={"query": "CSE 143"}).json()
+        workflow_id = discovery["workflow_id"]
+        for query in [
+            "show me information about the cse 143",
+            "show me information about CSE 143", "CSE\t 143",
+        ]:
+            for session in [None, workflow_id]:
+                payload = {"query": query}
+                if session:
+                    payload["workflow_id"] = session
+                response = api.post("/course-search", json=payload)
+                assert response.status_code == 200
+                exact = response.json()
+                assert exact["answer_type"] == "direct_answer"
+                assert exact["results"] == bare["results"]
+                assert exact["results"][0]["course_id"] == "CSE-143"
+                assert exact["results"][0]["citations"]
+                assert all(c["snapshot_id"] == snapshot["snapshot_id"] for c in exact["results"][0]["citations"])
+                state = api.get(exact["state_ref"]).json()
+                assert state["active_query"] == query
+                assert state["selected_courses"] == ["CSE-143"]
+                if session:
+                    assert exact["workflow_id"] == session
+
+        missing = api.post("/course-search", json={
+            "query": "show me information about the cse 999",
+            "workflow_id": workflow_id,
+        }).json()
+        assert missing["answer_type"] == "no_results"
+        assert missing["results"] == []
+        assert any("CSE-999" in note for note in missing["limitations"])
+        assert api.get(missing["state_ref"]).json()["selected_courses"] == []
+        for query in ["machine learning", "CSE courses"]:
+            fresh = api.post("/course-search", json={"query": query}).json()
+            reused = api.post("/course-search", json={"query": query, "workflow_id": workflow_id}).json()
+            assert reused["answer_type"] == fresh["answer_type"]
+            assert fresh["results"]
+            assert reused["results"] == fresh["results"]
