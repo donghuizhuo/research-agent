@@ -86,9 +86,9 @@ def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
     heuristic = _heuristic_intent(query)
     if heuristic.intent == QueryIntentType.exact_code or llm is None:
         return heuristic
-    structured_llm = llm.with_structured_output(QueryIntent)
     try:
-        return structured_llm.invoke(
+        structured_llm = llm.with_structured_output(QueryIntent)
+        result = structured_llm.invoke(
             [
                 {
                     "role": "system",
@@ -101,5 +101,7 @@ def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
                 {"role": "user", "content": query},
             ]
         )
+        # An empty/malformed structured response is also a model failure.
+        return QueryIntent.model_validate(result)
     except Exception:  # noqa: BLE001 - fall back to deterministic path
         return _heuristic_intent(query)

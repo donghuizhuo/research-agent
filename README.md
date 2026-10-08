@@ -33,3 +33,28 @@ For a direct course lookup, enter `CSE 143` or
 `show me information about the cse 143` in the CLI or Web UI. The latter also
 accepts omission of `the`. Course discovery queries such as
 `Which courses have CSE 142 as a prerequisite?` continue through discovery search.
+
+## Optional model mode
+
+Search and API serving default to deterministic catalog rendering. To opt in to
+the existing configured DeepSeek provider, set `DEEPSEEK_API_KEY` and either use
+`courseagent search "CSE 142" --llm-mode model` / `courseagent serve --llm-mode model`,
+or set `COURSEAGENT_LLM_MODE=model` before starting the CLI or API process.
+`--llm-mode deterministic` overrides the environment for either CLI command.
+Programmatic API callers can pass `DefaultConfig(llm_mode="model")` to `create_app`.
+
+Both entrypoints use the same quick/deep client construction. DeepSeek uses
+`DEEPSEEK_API_KEY` explicitly; an unrelated `OPENAI_API_KEY` does not enable it.
+Missing credentials, unsupported runtime providers, or either tier failing to
+initialize leave the whole graph deterministic. Invocation errors, including
+timeouts, fall back within each node. Requests have no automatic retries and
+a 10-second timeout per HTTP transport phase (connect/read/write/pool), configurable
+through `DefaultConfig.llm_timeout_seconds` in `(0, 60]`. This is a transport bound,
+not an overall workflow deadline.
+
+Typed course objects, metadata, and citations always come from retrieval, including
+when synthesis succeeds. Empty or non-text synthesis uses deterministic prose;
+no-results searches skip synthesis. The API schema is unchanged and serializes
+catalog results. CLI/graph `answer` may contain generated prose; `structured_answer`
+remains the authoritative catalog answer. Model prose is not validated against
+catalog facts by this contract fix.

@@ -41,7 +41,7 @@ def create_app(config: DefaultConfig | None = None) -> FastAPI:
 def get_graph(app: FastAPI) -> Any:
     """Return a CourseResearchGraph for the app's configuration."""
 
-    from courseagent.graph.course_graph import CourseResearchGraph
+    from courseagent.graph.runtime import create_graph
 
     cfg = app.state.config
-    return CourseResearchGraph(config=cfg)
+    return create_graph(cfg)

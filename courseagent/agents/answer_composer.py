@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from courseagent.agents.schemas import CourseAnswer, CourseSearchResult, QueryIntent, render_course_result
+from courseagent.agents.schemas import CourseAnswer, CourseSearchResult, render_course_result
 
 
 def _compose_without_llm(state: dict[str, Any]) -> CourseAnswer:
@@ -49,9 +49,11 @@ def compose_answer(state: dict[str, Any]) -> dict[str, Any]:
     answer directly from retrieved, cited facts (which is the grounded path).
     """
 
+    # Catalog objects and their provenance always come from retrieval. Generated
+    # prose is separate and cannot replace this authoritative typed answer.
+    answer = _compose_without_llm(state)
     llm = state.get("deep_llm")
-    if llm is None:
-        answer = _compose_without_llm(state)
+    if llm is None or not state.get("retrieved_courses"):
         return {"structured_answer": answer, "answer": answer.answer}
 
     courses = state.get("retrieved_courses", [])
@@ -67,8 +69,9 @@ def compose_answer(state: dict[str, Any]) -> dict[str, Any]:
     )
     try:
         raw = llm.invoke(prompt)
-        text = raw.content if hasattr(raw, "content") else str(raw)
-        return {"structured_answer": None, "answer": text}
+        text = raw.content if hasattr(raw, "content") else raw
+        if isinstance(text, str) and text.strip():
+            return {"structured_answer": answer, "answer": text}
     except Exception:  # noqa: BLE001 - fall back to deterministic rendering
-        answer = _compose_without_llm(state)
-        return {"structured_answer": answer, "answer": answer.answer}
+        pass
+    return {"structured_answer": answer, "answer": answer.answer}
