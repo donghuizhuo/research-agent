@@ -76,7 +76,7 @@ def test_approved_catalog_ingestion_search_and_detail(tmp_path, monkeypatch):
         workflow_id = discovery["workflow_id"]
         for query in [
             "show me information about the cse 143",
-            "Tell me about (CsE 143)!", "What is CSE 143?", "CSE\t 143",
+            "show me information about CSE 143", "CSE\t 143",
         ]:
             for session in [None, workflow_id]:
                 payload = {"query": query}

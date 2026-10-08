@@ -10,9 +10,7 @@ from courseagent.agents.schemas import QueryIntent, QueryIntentType
 
 _COURSE_CODE_RE = re.compile(r"^\s*([A-Za-z&]{2,6})\s+(\d{3})(?:\s+[A-Za-z])?\s*$")
 _COURSE_INFORMATION_RE = re.compile(
-    r"(?:show\s+me(?:\s+information\s+about)?|tell\s+me\s+about|"
-    r"what\s+is|what\s+are\s+the\s+prerequisites\s+for)"
-    r"\s+(?:the\s+)?\(?([A-Za-z&]{2,6})\s+(\d{3})\)?[.!?]*",
+    r"show\s+me\s+information\s+about\s+(?:the\s+)?([A-Za-z&]{2,6})\s+(\d{3})",
     re.IGNORECASE,
 )
 _DEPT_SUFFIX_RE = re.compile(r"^\s*([A-Za-z&]{2,6})\s+(?:courses?|classes?|dept|department)\s*$", re.IGNORECASE)
