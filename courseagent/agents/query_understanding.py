@@ -1,4 +1,4 @@
-"""Query intent classification node (quick-tier LLM -> structured output)."""
+"""Query intent classification node; see classify_query for routing policy."""
 
 from __future__ import annotations
 
@@ -76,8 +76,11 @@ def _heuristic_intent(query: str) -> QueryIntent:
 def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
     """Classify a user query into a structured QueryIntent.
 
-    Standalone codes and explicit course-information requests use deterministic
-    lookup even with an LLM client. Other queries use the client when provided, with heuristic fallback.
+    Standalone codes and full queries matching "show me information about
+    [the] <department> <number>" use deterministic lookup even with an LLM
+    client. The prose form requires a known department and whitespace between
+    the department and number; matching is case-insensitive. Other queries use
+    the client when provided, with heuristic fallback.
     """
 
     heuristic = _heuristic_intent(query)
