@@ -200,7 +200,8 @@ def test_api_cli_redact_before_models_and_checkpoints(catalog, monkeypatch, priv
     class CapturingQuick(QuickModel):
         def invoke(self, messages):
             prompts["quick"].append(messages)
-            return super().invoke(messages)
+            self.calls += 1
+            return _heuristic_intent("CSE 142")
 
     class CapturingDeep(ControlledModel):
         def invoke(self, messages):
@@ -241,3 +242,35 @@ def test_api_cli_redact_before_models_and_checkpoints(catalog, monkeypatch, priv
         assert "[REDACTED]" in serialized
         for secret in ("1234567", "user@uw.edu", "jsmith42"):
             assert secret not in serialized
+
+
+@pytest.mark.parametrize("private", ["1234567", "user@uw.edu", "netid: jsmith42"])
+def test_fully_redacted_api_cli_queries_return_no_results(catalog, monkeypatch, private):
+    prompts = []
+
+    class CapturingQuick(QuickModel):
+        def invoke(self, messages):
+            prompts.append(messages)
+            return _heuristic_intent("CSE 142")
+
+    quick, deep = CapturingQuick(), ControlledModel()
+    monkeypatch.setattr(factory, "create_tier_client",
+                        lambda config, tier: quick if tier == "quick" else deep)
+    registry, _ = main._load_registry()
+    cfg = replace(catalog, llm_mode="model")
+    monkeypatch.setattr(main, "_load_registry", lambda: (registry, cfg))
+    result = CliRunner().invoke(main.app, ["search", private])
+    assert result.exit_code == 0, result.output
+    actual = json.loads(result.output)
+    assert actual["status"] == "not_found"
+    assert actual["structured_answer"]["course"] is None
+    assert actual["structured_answer"]["ranked_courses"] == []
+    assert actual["answer"] == "No matching course found in approved indexed sources."
+    assert actual["citations"] == []
+    with TestClient(api_app.create_app(cfg)) as client:
+        response = client.post("/course-search", json={"query": private})
+        assert response.status_code == 200
+        assert response.json()["answer_type"] == "no_results"
+        assert response.json()["results"] == []
+    assert prompts == []
+    assert deep.calls == 0
