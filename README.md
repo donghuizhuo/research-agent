@@ -20,16 +20,48 @@ uv venv --python 3.13 .venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
 
-export DEEPSEEK_API_KEY="..."   # optional; deterministic path works without it
-
 courseagent ingest              # fetch + index approved sources
 courseagent search "CSE 142"    # run the graph
 courseagent serve               # API + Web UI on http://127.0.0.1:8000
 ```
 
 See `specs/001-course-search/quickstart.md` for full details.
+For model setup, see [Optional model mode](#optional-model-mode).
 
 For a direct course lookup, enter `CSE 143` or
 `show me information about the cse 143` in the CLI or Web UI. The latter also
 accepts omission of `the`. Course discovery queries such as
 `Which courses have CSE 142 as a prerequisite?` continue through discovery search.
+
+## Optional model mode
+
+Search and API serving default to deterministic catalog rendering. To opt in to
+the existing configured DeepSeek provider, set `DEEPSEEK_API_KEY` and either use
+`courseagent search "CSE 142" --llm-mode model` / `courseagent serve --llm-mode model`,
+or set `COURSEAGENT_LLM_MODE=model` before starting the CLI or API process.
+`--llm-mode deterministic` overrides the environment for either CLI command.
+Programmatic API callers can pass `DefaultConfig(llm_mode="model")` to `create_app`.
+
+Both entrypoints use the same quick/deep client construction. DeepSeek uses
+`DEEPSEEK_API_KEY` explicitly; an unrelated `OPENAI_API_KEY` does not enable it.
+Missing credentials, unsupported runtime providers, or either tier failing to
+initialize leave the whole graph deterministic. Invocation errors, including
+timeouts, fall back within each node. Requests have no automatic retries and
+a fixed 10-second timeout per HTTP transport phase (connect/read/write/pool).
+This is a transport bound, not an overall workflow deadline.
+
+Typed course objects, metadata, and citations always come from retrieval, including
+when synthesis succeeds. Empty or non-text synthesis uses deterministic prose;
+no-results searches skip synthesis. The API schema is unchanged and serializes
+catalog results. CLI/graph `answer` may contain generated prose; `structured_answer`
+remains the authoritative catalog answer. Model prose is not validated against
+catalog facts by this contract fix.
+
+API and CLI queries pass through the existing lexical redactor before graph state,
+checkpoint persistence, classification, or synthesis. It masks standalone seven-digit
+numbers, email addresses, and labeled NetID/student-ID tokens; it is not comprehensive
+sensitive-information detection. Queries containing only redaction placeholders
+and punctuation return the normal empty result without classification or synthesis
+model calls. Offline regressions capture both tiers’ emitted
+prompts and persisted checkpoints for these patterns and check unchanged catalog
+results. They do not evaluate live model interpretation or other sensitive formats.

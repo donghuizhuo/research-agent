@@ -79,3 +79,18 @@ def test_search_keyword(seeded_db) -> None:
 def test_search_natural_language(seeded_db) -> None:
     rows = retrieval.search_natural_language(seeded_db, "introductory programming course")
     assert len(rows) >= 1
+
+
+@pytest.mark.parametrize("keyword,expected", [
+    ("programming", {"CSE-142", "CSE-143"}),
+    ('"programming"', {"CSE-142", "CSE-143"}),
+    ("[programming]", {"CSE-142", "CSE-143"}),
+    ("(programming)", {"CSE-142", "CSE-143"}),
+    ("object-oriented", set()),
+    ("programming OR structures", set()),
+    ("NOT", set()), ("NEAR(programming)", set()),
+    ("prog*", set()), ('"[]():-*', set()), ("", set()),
+])
+def test_keyword_values_are_literal_fts_phrases(seeded_db, keyword, expected):
+    rows = retrieval.search_keyword(seeded_db, keyword)
+    assert {row["course_id"] for row in rows} == expected

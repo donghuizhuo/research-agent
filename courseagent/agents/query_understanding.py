@@ -86,9 +86,9 @@ def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
     heuristic = _heuristic_intent(query)
     if heuristic.intent == QueryIntentType.exact_code or llm is None:
         return heuristic
-    structured_llm = llm.with_structured_output(QueryIntent)
     try:
-        return structured_llm.invoke(
+        structured_llm = llm.with_structured_output(QueryIntent)
+        result = structured_llm.invoke(
             [
                 {
                     "role": "system",
@@ -101,5 +101,27 @@ def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
                 {"role": "user", "content": query},
             ]
         )
+        # An empty/malformed structured response is also a model failure.
+        intent = QueryIntent.model_validate(result)
+        if intent.intent == QueryIntentType.exact_code:
+            course_id = (intent.course_id or "").strip()
+            if not course_id:
+                department = (intent.department_code or "").strip()
+                number = (intent.course_number or "").strip()
+                course_id = f"{department} {number}"
+            code_match = _COURSE_CODE_RE.fullmatch(course_id.replace("-", " "))
+            if not code_match:
+                return _heuristic_intent(query)
+            intent.course_id = f"{code_match.group(1).upper()}-{code_match.group(2)}"
+        required_field = {
+            QueryIntentType.department: "department_code",
+            QueryIntentType.keyword: "keyword",
+        }.get(intent.intent)
+        if required_field:
+            value = (getattr(intent, required_field) or "").strip()
+            if not value:
+                return _heuristic_intent(query)
+            setattr(intent, required_field, value)
+        return intent
     except Exception:  # noqa: BLE001 - fall back to deterministic path
         return _heuristic_intent(query)

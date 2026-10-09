@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import os
 from pathlib import Path
+from typing import Literal
+
+LLMMode = Literal["deterministic", "model"]
 
 
 @dataclass(frozen=True)
@@ -16,7 +20,12 @@ class DefaultConfig:
     quick_model: str = "deepseek-chat"
     deep_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
+    llm_mode: LLMMode = field(default_factory=lambda: os.environ.get("COURSEAGENT_LLM_MODE", "deterministic"))
     max_tool_rounds: int = 4
+
+    def __post_init__(self) -> None:
+        if self.llm_mode not in ("deterministic", "model"):
+            raise ValueError("llm_mode must be deterministic or model")
 
 
 DEFAULT_CONFIG = DefaultConfig()

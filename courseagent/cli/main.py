@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from enum import Enum
 import sys
 import uuid
 from pathlib import Path
@@ -18,6 +20,11 @@ from courseagent.dataflows.source_registry import load_source_registry, register
 from courseagent.dataflows import fetcher, normalizer
 
 app = typer.Typer(help="UW Course Research Agent CLI")
+
+
+class LLMMode(str, Enum):
+    deterministic = "deterministic"
+    model = "model"
 
 
 def _load_registry() -> tuple:
@@ -93,24 +100,41 @@ def ingest(
 
 
 @app.command()
-def search(query: str = typer.Argument(...)) -> None:
+def search(
+    query: str = typer.Argument(...),
+    llm_mode: LLMMode | None = typer.Option(None, help="Override COURSEAGENT_LLM_MODE; default deterministic"),
+) -> None:
     """Run a search through the full LangGraph workflow."""
 
-    from courseagent.graph.course_graph import CourseResearchGraph
+    from courseagent.graph.runtime import create_graph
 
     registry, config = _load_registry()
-    graph = CourseResearchGraph(config)
-    result = graph.run(query)
-    typer.echo(json.dumps(result, indent=2, default=str))
+    if llm_mode is not None:
+        config = replace(config, llm_mode=llm_mode.value)
+    graph = create_graph(config)
+    try:
+        result = graph.run(query)
+        typer.echo(json.dumps(result, indent=2, default=str))
+    finally:
+        graph.close()
 
 
 @app.command()
-def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
+def serve(
+    host: str = "127.0.0.1", port: int = 8000,
+    llm_mode: LLMMode | None = typer.Option(None, help="Override COURSEAGENT_LLM_MODE; default deterministic"),
+) -> None:
     """Serve the FastAPI app and static web UI via uvicorn."""
 
     import uvicorn
 
-    uvicorn.run("courseagent.api.app:create_app", factory=True, host=host, port=port)
+    from config.default_config import DefaultConfig
+    from courseagent.api.app import create_app
+
+    config = DefaultConfig()
+    if llm_mode is not None:
+        config = replace(config, llm_mode=llm_mode.value)
+    uvicorn.run(create_app(config), host=host, port=port)
 
 
 if __name__ == "__main__":

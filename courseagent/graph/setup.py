@@ -23,7 +23,12 @@ def setup_graph(
     graph = StateGraph(CourseResearchState)
 
     def query_understanding_node(state: dict[str, Any]) -> dict[str, Any]:
-        intent = query_understanding.classify_query(state.get("query", ""), quick_llm)
+        query = state.get("query", "")
+        if "[REDACTED]" in query and not any(
+            char.isalnum() for char in query.replace("[REDACTED]", "")
+        ):
+            return {"intent": None, "interpreted_filters": {}, "status": "not_found"}
+        intent = query_understanding.classify_query(query, quick_llm)
         return {"intent": intent, "interpreted_filters": {}}
 
     # Retrieval nodes receive the shared DB connection and LLMs via closure.
@@ -56,8 +61,9 @@ def setup_graph(
     graph.add_edge(START, "query_understanding")
     graph.add_conditional_edges(
         "query_understanding",
-        route,
+        lambda state: "answer_composer" if state.get("status") == "not_found" else route(state),
         {
+            "answer_composer": "answer_composer",
             "exact_code_retriever": "exact_code_retriever",
             "department_retriever": "department_retriever",
             "keyword_retriever": "keyword_retriever",
