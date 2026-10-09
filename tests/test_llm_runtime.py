@@ -279,3 +279,54 @@ def test_fully_redacted_api_cli_queries_return_no_results(catalog, monkeypatch, 
         assert response.json()["results"] == []
     assert prompts == []
     assert deep.calls == 0
+
+
+@pytest.mark.parametrize("route,field", [
+    ("exact_code", "course_id"), ("department", "department_code"), ("keyword", "keyword"),
+])
+@pytest.mark.parametrize("missing", [True, False])
+@pytest.mark.parametrize("blank", [None, "", " \t "])
+def test_incomplete_classification_preserves_api_cli_catalog(catalog, monkeypatch, route, field, missing, blank):
+    record = {"intent": route}
+    if not missing:
+        record[field] = blank
+    _assert_classification_catalog(catalog, monkeypatch, record, "CSE courses", "CSE courses")
+
+
+@pytest.mark.parametrize("course_id", [None, "", " \t "])
+def test_exact_classification_normalizes_components(catalog, monkeypatch, course_id):
+    _assert_classification_catalog(catalog, monkeypatch, {
+        "intent": "exact_code", "course_id": course_id,
+        "department_code": " cse ", "course_number": " 142 ",
+    }, "explain introductory programming", "CSE 142")
+
+
+def _assert_classification_catalog(catalog, monkeypatch, record, query, baseline_query):
+    quick = Mock()
+    quick.with_structured_output.return_value = quick
+    quick.invoke.return_value = record
+    deep = ControlledModel()
+    monkeypatch.setattr(factory, "create_tier_client",
+                        lambda config, tier: quick if tier == "quick" else deep)
+    registry, _ = main._load_registry()
+    cfg = replace(catalog, llm_mode="model")
+    monkeypatch.setattr(main, "_load_registry", lambda: (registry, cfg))
+    runner = CliRunner()
+    baseline = runner.invoke(main.app, ["search", baseline_query, "--llm-mode", "deterministic"])
+    assert baseline.exit_code == 0, baseline.output
+    expected = json.loads(baseline.output)
+    result = runner.invoke(main.app, ["search", query])
+    assert result.exit_code == 0, result.output
+    actual = json.loads(result.output)
+    assert expected["structured_answer"]["course"] or expected["structured_answer"]["ranked_courses"]
+    for field in ("course", "ranked_courses", "citations", "freshness", "limitations", "status"):
+        assert actual["structured_answer"][field] == expected["structured_answer"][field]
+    assert actual["citations"] == expected["citations"]
+    with TestClient(api_app.create_app(catalog)) as client:
+        baseline_api = client.post("/course-search", json={"query": baseline_query}).json()
+    with TestClient(api_app.create_app(cfg)) as client:
+        response = client.post("/course-search", json={"query": query})
+        assert response.status_code == 200
+        assert response.json()["results"] == baseline_api["results"]
+        assert response.json()["answer_type"] == baseline_api["answer_type"]
+    assert quick.invoke.call_count == deep.calls == 2
