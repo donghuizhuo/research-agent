@@ -47,7 +47,7 @@ def search_keyword(conn: sqlite3.Connection, keyword: str, limit: int = 25) -> l
         ORDER BY rank
         LIMIT ?
         """,
-        (keyword, limit),
+        ('"' + keyword.replace('"', '""') + '"', limit),
     )
     return [dict(row) for row in cursor.fetchall()]
 

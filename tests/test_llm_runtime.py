@@ -362,3 +362,51 @@ def _assert_classification_catalog(catalog, monkeypatch, record, query, baseline
         assert response.json()["results"] == baseline_api["results"]
         assert response.json()["answer_type"] == baseline_api["answer_type"]
     assert quick.invoke.call_count == deep.calls == 2
+
+
+@pytest.mark.parametrize("keyword,has_matches", [
+    ("object-oriented", False), ("programming", True),
+    ('"programming"', True), ("[programming]", True), ("(programming)", True),
+    ("programming OR structures", False), ("NOT", False),
+    ("NEAR(programming)", False), ("prog*", False), ('"[]():-*', False),
+])
+def test_model_literal_keywords_api_cli(catalog, monkeypatch, keyword, has_matches):
+    quick = Mock()
+    quick.with_structured_output.return_value = quick
+    quick.invoke.return_value = {"intent": "keyword", "keyword": keyword}
+    deep = ControlledModel()
+    monkeypatch.setattr(factory, "create_tier_client",
+                        lambda config, tier: quick if tier == "quick" else deep)
+    registry, _ = main._load_registry()
+    cfg = replace(catalog, llm_mode="model")
+    monkeypatch.setattr(main, "_load_registry", lambda: (registry, cfg))
+    runner = CliRunner()
+    baseline = runner.invoke(main.app, ["search", "programming", "--llm-mode", "deterministic"])
+    assert baseline.exit_code == 0, baseline.output
+    expected = json.loads(baseline.output)
+    query = "find object oriented programming courses"
+    result = runner.invoke(main.app, ["search", query])
+    assert result.exit_code == 0, result.output
+    actual = json.loads(result.output)
+    if has_matches:
+        for field in ("course", "ranked_courses", "citations", "freshness", "status"):
+            assert actual["structured_answer"][field] == expected["structured_answer"][field]
+        assert actual["citations"] == expected["citations"]
+    else:
+        assert actual["structured_answer"]["course"] is None
+        assert actual["structured_answer"]["ranked_courses"] == []
+        assert actual["citations"] == []
+        assert actual["status"] == "not_found"
+    with TestClient(api_app.create_app(catalog)) as client:
+        baseline_api = client.post("/course-search", json={"query": "programming"}).json()
+    with TestClient(api_app.create_app(cfg)) as client:
+        response = client.post("/course-search", json={"query": query})
+        assert response.status_code == 200
+        if has_matches:
+            assert response.json()["results"] == baseline_api["results"]
+            assert response.json()["answer_type"] == baseline_api["answer_type"]
+        else:
+            assert response.json()["answer_type"] == "no_results"
+            assert response.json()["results"] == []
+    assert quick.invoke.call_count == 2
+    assert deep.calls == (2 if has_matches else 0)
