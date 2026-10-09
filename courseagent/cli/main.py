@@ -102,7 +102,7 @@ def ingest(
 @app.command()
 def search(
     query: str = typer.Argument(...),
-    llm_mode: LLMMode | None = typer.Option(None, help="Override COURSEAGENT_LLM_MODE; default deterministic"),
+    llm_mode: LLMMode | None = typer.Option(None, help="Override COURSEAGENT_LLM_MODE; default model"),
 ) -> None:
     """Run a search through the full LangGraph workflow."""
 
@@ -122,7 +122,7 @@ def search(
 @app.command()
 def serve(
     host: str = "127.0.0.1", port: int = 8000,
-    llm_mode: LLMMode | None = typer.Option(None, help="Override COURSEAGENT_LLM_MODE; default deterministic"),
+    llm_mode: LLMMode | None = typer.Option(None, help="Override COURSEAGENT_LLM_MODE; default model"),
 ) -> None:
     """Serve the FastAPI app and static web UI via uvicorn."""
 

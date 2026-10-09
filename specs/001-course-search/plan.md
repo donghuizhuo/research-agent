@@ -49,7 +49,7 @@ Mirror `TradingAgents` high-level design:
 | Robustness Against Stale, Conflicting, or Missing Data | Source tiers and conflict detection prevent silent overwrites; missing fields become limitation messages. |
 | Persistent and Explicit Workflow State | `CourseResearchState` is checkpointed by `SqliteSaver` per `workflow_id`, resumable and inspectable. |
 | Major Feature Testability and Validation | pytest unit tests for parsers/retrieval/routing; golden validation cases; graph integration tests. |
-| Ethical Automation Boundaries | Read-only; no enrollment/registration/private UW access; see [runtime synthesis limitations](../../README.md#optional-model-mode). |
+| Ethical Automation Boundaries | Read-only; no enrollment/registration/private UW access; see [runtime synthesis limitations](../../README.md#model-mode). |
 
 No constitution violations identified.
 
@@ -187,7 +187,7 @@ The Answer Composer receives retrieved courses + citations as its only factual c
 - Never assert live enrollment, seats, registration status, or schedule.
 
 For the implemented catalog-answer contract and synthesis limitations, see
-[README: Optional model mode](../../README.md#optional-model-mode). The Grounding
+[README: Model mode](../../README.md#model-mode). The Grounding
 Verifier adds limitations for retrieved courses without citations; it does not
 verify generated prose (see `courseagent/agents/grounding.py`).
 

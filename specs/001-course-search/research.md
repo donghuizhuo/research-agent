@@ -11,7 +11,7 @@
 
 ## Decision: Grounded answer synthesis only
 
-**Rationale**: The constitution mandates source-grounded accuracy. The LLM is used for query understanding and for composing answers strictly from retrieved, cited facts; it must never generate course facts from parametric memory. For the implemented contract and verification limits, see [README: Optional model mode](../../README.md#optional-model-mode).
+**Rationale**: The constitution mandates source-grounded accuracy. The LLM is used for query understanding and for composing answers strictly from retrieved, cited facts; it must never generate course facts from parametric memory. For the implemented contract and verification limits, see [README: Model mode](../../README.md#model-mode).
 
 **Alternatives considered**:
 

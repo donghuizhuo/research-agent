@@ -1,4 +1,4 @@
-"""Shared opt-in model construction for API and CLI workflows."""
+"""Shared model construction for API and CLI workflows."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from courseagent.llm_clients import factory
 
 
 def create_graph(config: DefaultConfig) -> CourseResearchGraph:
-    """Use the supported configured provider only in explicit model mode.
+    """Use the supported configured provider when model mode is selected.
 
     Missing credentials or initialization failure leave both tiers deterministic.
     Client transport timeouts and disabled retries bound provider waits; each

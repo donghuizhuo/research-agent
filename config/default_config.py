@@ -20,7 +20,7 @@ class DefaultConfig:
     quick_model: str = "deepseek-chat"
     deep_model: str = "deepseek-chat"
     deepseek_base_url: str = "https://api.deepseek.com"
-    llm_mode: LLMMode = field(default_factory=lambda: os.environ.get("COURSEAGENT_LLM_MODE", "deterministic"))
+    llm_mode: LLMMode = field(default_factory=lambda: os.environ.get("COURSEAGENT_LLM_MODE", "model"))
     max_tool_rounds: int = 4
 
     def __post_init__(self) -> None:

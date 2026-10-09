@@ -58,8 +58,8 @@
 **Independent test**: After manual ingestion of the CSE catalog, invoking the graph with `{"query":"CSE 142","intent":"exact_code"}` returns an answer with citation and freshness, checkpointed under a `workflow_id`.
 
 - [x] T022 [US1] Implement `exact_code_retriever(state)` node that calls `find_course_by_code` and populates `retrieved_courses`, `citations`, and `freshness` in `courseagent/agents/retrievers.py`
-- [x] T023 [US1] Implement `compose_answer(state)` in `courseagent/agents/answer_composer.py`; see the [catalog answer and optional synthesis contract](../../README.md#optional-model-mode).
-- [x] T024 [US1] Implement `verify_grounding(state)` in `courseagent/agents/grounding.py`; see [verification limits](../../README.md#optional-model-mode).
+- [x] T023 [US1] Implement `compose_answer(state)` in `courseagent/agents/answer_composer.py`; see the [catalog answer and optional synthesis contract](../../README.md#model-mode).
+- [x] T024 [US1] Implement `verify_grounding(state)` in `courseagent/agents/grounding.py`; see [verification limits](../../README.md#model-mode).
 - [x] T025 [US1] Implement `setup_graph()` building the `StateGraph` with `START -> Query Understanding -> conditional -> retriever -> Answer Composer -> Grounding Verifier -> END` in `courseagent/graph/setup.py`
 - [x] T026 [US1] Implement `SqliteSaver` wrapper `get_checkpointer(data_dir, workflow_id)` and deterministic `thread_id` helper in `courseagent/graph/checkpointer.py`
 - [x] T027 [US1] Implement `CourseResearchGraph` orchestration class with `run(query, workflow_id)` that compiles with the checkpointer and invokes/streams the graph in `courseagent/graph/course_graph.py`
