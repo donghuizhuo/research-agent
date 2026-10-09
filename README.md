@@ -49,8 +49,7 @@ Missing credentials, unsupported runtime providers, or either tier failing to
 initialize leave the whole graph deterministic. Invocation errors, including
 timeouts, fall back within each node. Requests have no automatic retries and
 a fixed 10-second timeout per HTTP transport phase (connect/read/write/pool).
-This is a transport bound,
-not an overall workflow deadline.
+This is a transport bound, not an overall workflow deadline.
 
 Typed course objects, metadata, and citations always come from retrieval, including
 when synthesis succeeds. Empty or non-text synthesis uses deterministic prose;
@@ -62,6 +61,8 @@ catalog facts by this contract fix.
 API and CLI queries pass through the existing lexical redactor before graph state,
 checkpoint persistence, classification, or synthesis. It masks standalone seven-digit
 numbers, email addresses, and labeled NetID/student-ID tokens; it is not comprehensive
-sensitive-information detection. Offline regressions capture both tiers’ emitted
+sensitive-information detection. Queries containing only redaction placeholders
+and punctuation return the normal empty result without classification or synthesis
+model calls. Offline regressions capture both tiers’ emitted
 prompts and persisted checkpoints for these patterns and check unchanged catalog
 results. They do not evaluate live model interpretation or other sensitive formats.

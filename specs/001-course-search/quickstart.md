@@ -7,8 +7,8 @@ are runnable from the repository root.
 
 - Python 3.11+ (3.13 recommended).
 - `uv` (or any PEP 621-compatible installer) for dependency management.
-- Optional `DEEPSEEK_API_KEY` for LLM-based query understanding and answer
-  synthesis. The deterministic path works without it.
+- For optional model setup and runtime behavior, see
+  [README: Optional model mode](../../README.md#optional-model-mode).
 
 ## Setup
 

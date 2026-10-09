@@ -11,7 +11,7 @@
 
 ## Decision: Grounded answer synthesis only
 
-**Rationale**: The constitution mandates source-grounded accuracy. The LLM is used for query understanding and for composing answers strictly from retrieved, cited facts; it must never generate course facts from parametric memory. A deterministic Grounding Verifier checks that substantive claims carry citations.
+**Rationale**: The constitution mandates source-grounded accuracy. The LLM is used for query understanding and for composing answers strictly from retrieved, cited facts; it must never generate course facts from parametric memory. For the implemented contract and verification limits, see [README: Optional model mode](../../README.md#optional-model-mode).
 
 **Alternatives considered**:
 
