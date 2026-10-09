@@ -103,13 +103,17 @@ def classify_query(query: str, llm: Any | None = None) -> QueryIntent:
         )
         # An empty/malformed structured response is also a model failure.
         intent = QueryIntent.model_validate(result)
-        if intent.intent == QueryIntentType.exact_code and not (intent.course_id or "").strip():
-            department = (intent.department_code or "").strip().upper()
-            number = (intent.course_number or "").strip()
-            if department and number:
-                intent.course_id = f"{department}-{number}"
+        if intent.intent == QueryIntentType.exact_code:
+            course_id = (intent.course_id or "").strip()
+            if not course_id:
+                department = (intent.department_code or "").strip()
+                number = (intent.course_number or "").strip()
+                course_id = f"{department} {number}"
+            code_match = _COURSE_CODE_RE.fullmatch(course_id.replace("-", " "))
+            if not code_match:
+                return _heuristic_intent(query)
+            intent.course_id = f"{code_match.group(1).upper()}-{code_match.group(2)}"
         required_field = {
-            QueryIntentType.exact_code: "course_id",
             QueryIntentType.department: "department_code",
             QueryIntentType.keyword: "keyword",
         }.get(intent.intent)

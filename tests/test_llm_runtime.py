@@ -301,6 +301,34 @@ def test_exact_classification_normalizes_components(catalog, monkeypatch, course
     }, "explain introductory programming", "CSE 142")
 
 
+@pytest.mark.parametrize("course_id", ["CSE 142", "CSE-142", " cse   142 ", "cse-142", "CSE 142 A"])
+@pytest.mark.parametrize("components", [False, True])
+def test_populated_exact_classification_normalizes_ids(catalog, monkeypatch, course_id, components):
+    record = {"intent": "exact_code", "course_id": course_id}
+    if components:
+        record.update(department_code="CSE", course_number="142")
+    _assert_classification_catalog(catalog, monkeypatch, record, "CSE 142", "CSE 142")
+
+
+@pytest.mark.parametrize("course_id", ["invalid", "CSE/142", "CSE-14", "CSE-142 extra"])
+def test_invalid_populated_exact_classification_falls_back(catalog, monkeypatch, course_id):
+    _assert_classification_catalog(catalog, monkeypatch, {
+        "intent": "exact_code", "course_id": course_id,
+        "department_code": "CSE", "course_number": "142",
+    }, "CSE 142", "CSE 142")
+
+
+@pytest.mark.parametrize("components", [
+    {"department_code": "CSE"}, {"course_number": "142"},
+    {"department_code": " ", "course_number": "142"},
+    {"department_code": "CSE", "course_number": "14"},
+])
+def test_invalid_exact_components_fall_back(catalog, monkeypatch, components):
+    _assert_classification_catalog(catalog, monkeypatch, {
+        "intent": "exact_code", **components,
+    }, "CSE 142", "CSE 142")
+
+
 def _assert_classification_catalog(catalog, monkeypatch, record, query, baseline_query):
     quick = Mock()
     quick.with_structured_output.return_value = quick
