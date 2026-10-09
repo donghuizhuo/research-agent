@@ -36,11 +36,12 @@ class QuickModel:
         return _heuristic_intent(messages[-1]["content"])
 
 
-@pytest.mark.parametrize("case", ["default", "missing", "initialization", "success", "failure", "timeout", "empty", "classification_empty"])
-def test_api_and_cli_share_opt_in_and_fallback(catalog, monkeypatch, case):
+@pytest.mark.parametrize("case", ["deterministic", "missing", "initialization", "success", "failure", "timeout", "empty", "classification_empty"])
+def test_api_and_cli_share_default_model_and_fallback(catalog, monkeypatch, case):
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "unrelated-key-must-not-be-used")
-    mode = "deterministic" if case == "default" else "model"
+    monkeypatch.delenv("COURSEAGENT_LLM_MODE", raising=False)
+    mode = "deterministic" if case == "deterministic" else DefaultConfig().llm_mode
     cfg = replace(catalog, llm_mode=mode)
     error = (httpx.ReadTimeout("controlled timeout") if case == "timeout" else
              RuntimeError("controlled failure") if case == "failure" else None)
@@ -81,10 +82,10 @@ def test_api_and_cli_share_opt_in_and_fallback(catalog, monkeypatch, case):
     assert actual_api["answer_type"] == "direct_answer"
     assert actual_api["results"] == baseline_api["results"]
     assert actual_api["limitations"] == baseline_api["limitations"]
-    enabled = case not in ("default", "missing", "initialization")
+    enabled = case not in ("deterministic", "missing", "initialization")
     assert quick.calls == 0
     assert deep.calls == (2 if enabled else 0)
-    assert len(kwargs_seen) == (0 if case in ("default", "missing") else 4)
+    assert len(kwargs_seen) == (0 if case in ("deterministic", "missing") else 4)
     for kwargs in kwargs_seen:
         assert kwargs["api_key"] == "synthetic-deepseek-key"
         assert kwargs["base_url"] == cfg.deepseek_base_url
@@ -105,9 +106,13 @@ def test_model_flag_overrides_deterministic_configuration(catalog, monkeypatch):
     assert deep.calls == 1
 
 
-def test_environment_opt_in_and_explicit_deterministic_override(monkeypatch):
+def test_default_model_and_explicit_deterministic_override(monkeypatch):
     monkeypatch.delenv("COURSEAGENT_LLM_MODE", raising=False)
+    assert DefaultConfig().llm_mode == "model"
+    assert api_app.create_app().state.config.llm_mode == "model"
+    monkeypatch.setenv("COURSEAGENT_LLM_MODE", "deterministic")
     assert DefaultConfig().llm_mode == "deterministic"
+    assert api_app.create_app().state.config.llm_mode == "deterministic"
     monkeypatch.setenv("COURSEAGENT_LLM_MODE", "model")
     assert api_app.create_app().state.config.llm_mode == "model"
     assert api_app.create_app(DefaultConfig(llm_mode="deterministic")).state.config.llm_mode == "deterministic"
@@ -129,13 +134,17 @@ def test_classification_binding_failure_falls_back(catalog, monkeypatch):
     assert deep.calls == 1
 
 
-def test_serve_passes_mode_to_real_app_configuration(monkeypatch):
+@pytest.mark.parametrize("explicit", [False, True])
+def test_serve_passes_mode_to_real_app_configuration(monkeypatch, explicit):
     run = Mock()
     monkeypatch.setattr("uvicorn.run", run)
-    monkeypatch.setenv("COURSEAGENT_LLM_MODE", "model")
-    result = CliRunner().invoke(main.app, ["serve", "--llm-mode", "deterministic", "--port", "8123"])
+    monkeypatch.delenv("COURSEAGENT_LLM_MODE", raising=False)
+    args = ["serve", "--port", "8123"]
+    if explicit:
+        args += ["--llm-mode", "deterministic"]
+    result = CliRunner().invoke(main.app, args)
     assert result.exit_code == 0, result.output
-    assert run.call_args.args[0].state.config.llm_mode == "deterministic"
+    assert run.call_args.args[0].state.config.llm_mode == ("deterministic" if explicit else "model")
     assert run.call_args.kwargs == {"host": "127.0.0.1", "port": 8123}
 
 

@@ -203,10 +203,10 @@ The graph operates over `CourseResearchState(MessagesState)` with fields `query`
 
 - **Web UI**: Simple static browser interface for search, result inspection, citations/freshness display, limitation messages, and workflow-state-backed follow-ups.
 - **FastAPI**: Serves the Web UI and the `POST /course-search`, `GET /courses/{id}`, `GET /workflows/{id}`, and `POST /admin/snapshots/import` endpoints; delegates each search to the LangGraph agent.
-- **Query Understanding**: Produces a structured `QueryIntent` (intent + parsed filters); see `classify_query` in `courseagent/agents/query_understanding.py` for the deterministic and quick-tier LLM routing policy and [runtime model behavior](../../README.md#optional-model-mode).
+- **Query Understanding**: Produces a structured `QueryIntent` (intent + parsed filters); see `classify_query` in `courseagent/agents/query_understanding.py` for the deterministic and quick-tier LLM routing policy and [runtime model behavior](../../README.md#model-mode).
 - **ConditionalLogic**: Deterministic router mapping `intent` to the matching retrieval node or responder.
 - **Retrieval nodes**: Deterministic SQLite/FTS lookups (`exact_code`, `department`, `keyword`, `natural_language`) that populate `retrieved_courses`, `citations`, and `freshness`. No live UW systems.
-- **Answer Composer**: See the [authoritative catalog answer and optional synthesis contract](../../README.md#optional-model-mode).
+- **Answer Composer**: See the [authoritative catalog answer and optional synthesis contract](../../README.md#model-mode).
 - **Grounding Verifier**: Adds limitations for retrieved courses without citations; it does not validate generated prose (see `courseagent/agents/grounding.py`).
 - **Clarifier / OutOfScopeResponder**: Ambiguity follow-up and out-of-scope/live-only limitation responses.
 - **SqliteSaver checkpointer**: Persistent, resumable workflow state per `workflow_id`.

@@ -26,21 +26,25 @@ courseagent serve               # API + Web UI on http://127.0.0.1:8000
 ```
 
 See `specs/001-course-search/quickstart.md` for full details.
-For model setup, see [Optional model mode](#optional-model-mode).
+For model setup, see [Model mode](#model-mode).
 
 For a direct course lookup, enter `CSE 143` or
 `show me information about the cse 143` in the CLI or Web UI. The latter also
 accepts omission of `the`. Course discovery queries such as
 `Which courses have CSE 142 as a prerequisite?` continue through discovery search.
 
-## Optional model mode
+## Model mode
 
-Search and API serving default to deterministic catalog rendering. To opt in to
-the existing configured DeepSeek provider, set `DEEPSEEK_API_KEY` and either use
-`courseagent search "CSE 142" --llm-mode model` / `courseagent serve --llm-mode model`,
-or set `COURSEAGENT_LLM_MODE=model` before starting the CLI or API process.
-`--llm-mode deterministic` overrides the environment for either CLI command.
-Programmatic API callers can pass `DefaultConfig(llm_mode="model")` to `create_app`.
+Search and API serving default to model mode with the existing configured DeepSeek
+provider. Set `DEEPSEEK_API_KEY`, then run `courseagent search "CSE 142"` or
+`courseagent serve`; no mode flag is required. Shared `DefaultConfig()` construction
+also selects model mode when `COURSEAGENT_LLM_MODE` is absent.
+
+For deterministic catalog rendering, set `COURSEAGENT_LLM_MODE=deterministic` before
+starting the CLI or API process, or use `--llm-mode deterministic` with either CLI
+command. CLI mode flags override the environment, including `--llm-mode model`.
+Programmatic API callers can pass `DefaultConfig(llm_mode="deterministic")` to
+`create_app` to bypass the provider.
 
 Both entrypoints use the same quick/deep client construction. DeepSeek uses
 `DEEPSEEK_API_KEY` explicitly; an unrelated `OPENAI_API_KEY` does not enable it.

@@ -7,8 +7,8 @@ are runnable from the repository root.
 
 - Python 3.11+ (3.13 recommended).
 - `uv` (or any PEP 621-compatible installer) for dependency management.
-- For optional model setup and runtime behavior, see
-  [README: Optional model mode](../../README.md#optional-model-mode).
+- For model credentials and setup and runtime behavior, see
+  [README: Model mode](../../README.md#model-mode).
 
 ## Setup
 
