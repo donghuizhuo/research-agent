@@ -20,14 +20,13 @@ uv venv --python 3.13 .venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
 
-export DEEPSEEK_API_KEY="..."   # optional; deterministic path works without it
-
 courseagent ingest              # fetch + index approved sources
 courseagent search "CSE 142"    # run the graph
 courseagent serve               # API + Web UI on http://127.0.0.1:8000
 ```
 
 See `specs/001-course-search/quickstart.md` for full details.
+For model setup, see [Optional model mode](#optional-model-mode).
 
 For a direct course lookup, enter `CSE 143` or
 `show me information about the cse 143` in the CLI or Web UI. The latter also

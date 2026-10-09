@@ -37,6 +37,12 @@ def search_department(conn: sqlite3.Connection, department_code: str, limit: int
 
 
 def search_keyword(conn: sqlite3.Connection, keyword: str, limit: int = 25) -> list[dict[str, Any]]:
+    """Match a literal FTS phrase, never caller-supplied FTS operators.
+
+    SQL parameters do not escape MATCH syntax; quote the phrase and double
+    embedded quotes so user and model keywords cannot become query syntax.
+    """
+
     cursor = conn.execute(
         """
         SELECT c.*, s.title AS match_title, bm25(search_documents_fts) AS rank

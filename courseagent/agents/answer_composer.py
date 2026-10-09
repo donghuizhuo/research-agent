@@ -43,11 +43,7 @@ def _compose_without_llm(state: dict[str, Any]) -> CourseAnswer:
 
 
 def compose_answer(state: dict[str, Any]) -> dict[str, Any]:
-    """Synthesize a grounded answer strictly from retrieved courses + citations.
-
-    The LLM is optional: when absent, the deterministic renderer produces the
-    answer directly from retrieved, cited facts (which is the grounded path).
-    """
+    """Compose the catalog answer with optional, unverified model prose."""
 
     # Catalog objects and their provenance always come from retrieval. Generated
     # prose is separate and cannot replace this authoritative typed answer.
