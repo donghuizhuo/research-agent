@@ -24,7 +24,9 @@ def setup_graph(
 
     def query_understanding_node(state: dict[str, Any]) -> dict[str, Any]:
         query = state.get("query", "")
-        if "[REDACTED]" in query and not query.replace("[REDACTED]", "").strip():
+        if "[REDACTED]" in query and not any(
+            char.isalnum() for char in query.replace("[REDACTED]", "")
+        ):
             return {"intent": None, "interpreted_filters": {}, "status": "not_found"}
         intent = query_understanding.classify_query(query, quick_llm)
         return {"intent": intent, "interpreted_filters": {}}

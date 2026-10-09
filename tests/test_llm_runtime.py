@@ -244,8 +244,13 @@ def test_api_cli_redact_before_models_and_checkpoints(catalog, monkeypatch, priv
             assert secret not in serialized
 
 
-@pytest.mark.parametrize("private", ["1234567", "user@uw.edu", "netid: jsmith42"])
-def test_fully_redacted_api_cli_queries_return_no_results(catalog, monkeypatch, private):
+@pytest.mark.parametrize("private", [
+    "1234567", "user@uw.edu", "netid: jsmith42",
+    "(1234567)", "(user@uw.edu)", "(netid: jsmith42)",
+    " [1234567], (user@uw.edu)! ", "“1234567”", "((user@uw.edu))",
+])
+@pytest.mark.parametrize("mode", ["deterministic", "model"])
+def test_fully_redacted_api_cli_queries_return_no_results(catalog, monkeypatch, private, mode):
     prompts = []
 
     class CapturingQuick(QuickModel):
@@ -257,7 +262,7 @@ def test_fully_redacted_api_cli_queries_return_no_results(catalog, monkeypatch, 
     monkeypatch.setattr(factory, "create_tier_client",
                         lambda config, tier: quick if tier == "quick" else deep)
     registry, _ = main._load_registry()
-    cfg = replace(catalog, llm_mode="model")
+    cfg = replace(catalog, llm_mode=mode)
     monkeypatch.setattr(main, "_load_registry", lambda: (registry, cfg))
     result = CliRunner().invoke(main.app, ["search", private])
     assert result.exit_code == 0, result.output
