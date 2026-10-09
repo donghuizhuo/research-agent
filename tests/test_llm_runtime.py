@@ -82,7 +82,8 @@ def test_api_and_cli_share_opt_in_and_fallback(catalog, monkeypatch, case):
     assert actual_api["results"] == baseline_api["results"]
     assert actual_api["limitations"] == baseline_api["limitations"]
     enabled = case not in ("default", "missing", "initialization")
-    assert quick.calls == deep.calls == (2 if enabled else 0)
+    assert quick.calls == 0
+    assert deep.calls == (2 if enabled else 0)
     assert len(kwargs_seen) == (0 if case in ("default", "missing") else 4)
     for kwargs in kwargs_seen:
         assert kwargs["api_key"] == "synthetic-deepseek-key"
@@ -100,7 +101,8 @@ def test_model_flag_overrides_deterministic_configuration(catalog, monkeypatch):
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["answer"] == deep.content
     assert called.call_count == 2
-    assert quick.calls == deep.calls == 1
+    assert quick.calls == 0
+    assert deep.calls == 1
 
 
 def test_environment_opt_in_and_explicit_deterministic_override(monkeypatch):
@@ -120,9 +122,10 @@ def test_classification_binding_failure_falls_back(catalog, monkeypatch):
     quick.with_structured_output.side_effect = RuntimeError("binding failed")
     deep = ControlledModel()
     monkeypatch.setattr(factory, "create_tier_client", Mock(side_effect=[quick, deep]))
-    result = CliRunner().invoke(main.app, ["search", "CSE 142", "--llm-mode", "model"])
+    result = CliRunner().invoke(main.app, ["search", "CSE courses", "--llm-mode", "model"])
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["structured_answer"]["course"]["course_id"] == "CSE-142"
+    assert json.loads(result.output)["structured_answer"]["ranked_courses"]
+    quick.with_structured_output.assert_called_once()
     assert deep.calls == 1
 
 
@@ -228,7 +231,8 @@ def test_api_cli_redact_before_models_and_checkpoints(catalog, monkeypatch, priv
         assert response.status_code == 200
         assert response.json()["results"] == expected["results"]
         assert response.json()["answer_type"] == expected["answer_type"]
-    assert quick.calls == deep.calls == 4
+    assert quick.calls == 2
+    assert deep.calls == 4
     manager = CheckpointerManager(catalog.data_dir)
     try:
         checkpoints = [entry.checkpoint for entry in manager.saver.list(None)]
@@ -307,7 +311,7 @@ def test_populated_exact_classification_normalizes_ids(catalog, monkeypatch, cou
     record = {"intent": "exact_code", "course_id": course_id}
     if components:
         record.update(department_code="CSE", course_number="142")
-    _assert_classification_catalog(catalog, monkeypatch, record, "CSE 142", "CSE 142")
+    _assert_classification_catalog(catalog, monkeypatch, record, "explain introductory programming", "CSE 142")
 
 
 @pytest.mark.parametrize("course_id", ["invalid", "CSE/142", "CSE-14", "CSE-142 extra"])
@@ -315,7 +319,7 @@ def test_invalid_populated_exact_classification_falls_back(catalog, monkeypatch,
     _assert_classification_catalog(catalog, monkeypatch, {
         "intent": "exact_code", "course_id": course_id,
         "department_code": "CSE", "course_number": "142",
-    }, "CSE 142", "CSE 142")
+    }, "CSE courses", "CSE courses")
 
 
 @pytest.mark.parametrize("components", [
@@ -326,7 +330,7 @@ def test_invalid_populated_exact_classification_falls_back(catalog, monkeypatch,
 def test_invalid_exact_components_fall_back(catalog, monkeypatch, components):
     _assert_classification_catalog(catalog, monkeypatch, {
         "intent": "exact_code", **components,
-    }, "CSE 142", "CSE 142")
+    }, "CSE courses", "CSE courses")
 
 
 def _assert_classification_catalog(catalog, monkeypatch, record, query, baseline_query):
